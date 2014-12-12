@@ -1,0 +1,36 @@
+{
+  "wallet": {
+    "folder": "wallet",
+    "name": "joeWallet"
+  },
+  "prefix": "tradle",
+  "maxDataBytes": 40,
+  "network": "testnet",
+  "allowSpendUnconfirmed": true,
+  
+  "joeAddress" : {
+    "host": "http://127.0.0.1",
+    "port": 8080
+  },
+  
+  "webHookMaxTimeouts": 3,
+  
+  "webHooks": [
+    {
+      "url": "http://127.0.0.1:8880",
+      "events": ["KeyValue", "Rewind"],
+      "unlimitedTimeouts": true
+    }
+  ],
+
+  "keeperAddresses" : [
+    {
+      "host": "http://127.0.0.1",
+      "port": 8008
+    },
+    {
+      "host": "http://127.0.0.1",
+      "port": 8009
+    }
+  ]
+}

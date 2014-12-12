@@ -1,0 +1,37 @@
+{
+  "name": "node-bitjoe",
+  "version": "0.0.1",
+  "description": "Tradle component bitjoe node implementation",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [
+    "bitcoin",
+    "blockchain",
+    "tradenet",
+    "tradle",
+    "distributed",
+    "storage",
+    "decentralized",
+    "storage"
+  ],
+  "author": "Mark Vayngrib <mark.vayngrib@lablz.com> (http://github.com/mvayngrib)",
+  "license": "MIT",
+  "dependencies": {
+    "bip38": "^1.1.1",
+    "bip39": "^2.1.0",
+    "bitcoinjs-lib": "^1.4.1",
+    "cb-wallet": "^0.6.1",
+    "extend": "^2.0.0",
+    "secure-random": "^1.1.1"
+  },
+  "devDependencies": {
+    "grunt": "^0.4.5",
+    "grunt-contrib-jshint": "^0.10.0",
+    "grunt-githooks": "^0.3.1",
+    "grunt-jsbeautifier": "^0.2.7",
+    "jscoverage": "^0.5.9",
+    "load-grunt-tasks": "^1.0.0"
+  }
+}
