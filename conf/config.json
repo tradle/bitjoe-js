@@ -1,16 +1,17 @@
 {
   "wallet": {
     "folder": "wallet",
-    "name": "joeWallet"
+    "name": "joeWallet",
+    "password": "bogus"
   },
   "prefix": "tradle",
   "maxDataBytes": 40,
-  "network": "testnet",
+  "networkName": "testnet",
   "allowSpendUnconfirmed": true,
   
-  "joeAddress" : {
+  "address" : {
     "host": "http://127.0.0.1",
-    "port": 8080
+    "port": 8081
   },
   
   "webHookMaxTimeouts": 3,

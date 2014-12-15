@@ -1,0 +1,218 @@
+{
+  "valid": [
+    {
+      "seed": "043c72ff615427ee4daf77b05206abd27de3b7655736539b88ea4e533bbd492d",
+      "network": "testnet",
+      "balance": 560000,
+      "confirmedBalance": 200000,
+      "transactions": [
+        {
+          "description": "standard transaction (no change)",
+          "outputs": [
+            {
+              "address": "n2PEoV6Abxnrpzoqqq1TJT5kw8G2dMPpBd",
+              "value": 165000
+            }
+          ],
+          "expected": {
+            "txId": "f1f48f18f7821f70eef40c4bcc7bb0ba7d9704469684c85ab05ca43abe1d1f2a",
+            "inputs": [
+              1
+            ],
+            "change": 0,
+            "fee": 10000
+          }
+        },
+        {
+          "description": "standard transaction",
+          "outputs": [
+            {
+              "address": "n2PEoV6Abxnrpzoqqq1TJT5kw8G2dMPpBd",
+              "value": 177000
+            }
+          ],
+          "expected": {
+            "txId": "2cae462629324342cb03d2147754fe7b05b519b08806c48f0a52e40441a8c8e8",
+            "inputs": [
+              0,
+              1
+            ],
+            "change": 13000,
+            "fee": 10000
+          }
+        },
+        {
+          "description": "many outputs transaction",
+          "outputs": [
+            {
+              "address": "n2PEoV6Abxnrpzoqqq1TJT5kw8G2dMPpBd",
+              "value": 30000
+            },
+            {
+              "address": "mtoKs9V381UAhUia3d7Vb9GNak8Qvmcsme",
+              "value": 40000
+            }
+          ],
+          "expected": {
+            "txId": "0f81b1619e83fb7260734c758212a7e30dbbadb3359fbba0fb9376ddf0eb482b",
+            "inputs": [
+              1
+            ],
+            "change": 95000,
+            "fee": 10000
+          }
+        },
+        {
+          "description": "uses only confirmed outputs",
+          "outputs": [
+            {
+              "address": "n2PEoV6Abxnrpzoqqq1TJT5kw8G2dMPpBd",
+              "value": 190000
+            }
+          ],
+          "expected": {
+            "txId": "ac2b1e8ea344cd943e18584b84703814a4fe8fdb81cd17fe37043644e54eedf9",
+            "inputs": [
+              0,
+              1
+            ],
+            "change": 0,
+            "fee": 10000
+          }
+        },
+        {
+          "description": "ignores change if it is not above dust threshold",
+          "outputs": [
+            {
+              "address": "n2PEoV6Abxnrpzoqqq1TJT5kw8G2dMPpBd",
+              "value": 189600
+            }
+          ],
+          "expected": {
+            "txId": "d1aa1e20a0b46311af79b4bf902a3fcbf17fd1ea409bcc5bcee24299d3d44928",
+            "inputs": [
+              0,
+              1
+            ],
+            "change": 0,
+            "fee": 10400
+          }
+        }
+      ],
+      "json": {
+        "external": {
+          "addresses": [
+            "n1GyUANZand9Kw6hGSV9837cCC9FFUQzQa",
+            "n2fiWrHqD6GM5GiEqkbWAc6aaZQp3ba93X"
+          ],
+          "map": {
+            "n1GyUANZand9Kw6hGSV9837cCC9FFUQzQa": 0,
+            "n2fiWrHqD6GM5GiEqkbWAc6aaZQp3ba93X": 1
+          },
+          "node": "tprv8egjKjkFbDGo2jWKNuWRQn8krt7SXC6nCxey8kLEUK5tjEDEUbH5ugBm8fcqyuL8G1fp6aEUeTkmxmrrytPqAYbkXuG5E2yugr8f4jNHDS4"
+        },
+        "internal": {
+          "addresses": [
+            "mnXiDR4MKsFxcKJEZjx4353oXvo55iuptn",
+            "mtQrg4dcAVhDDzbyXawmRbpzRTRiUgfAE5"
+          ],
+          "map": {
+            "mnXiDR4MKsFxcKJEZjx4353oXvo55iuptn": 0,
+            "mtQrg4dcAVhDDzbyXawmRbpzRTRiUgfAE5": 1
+          },
+          "node": "tprv8egjKjkFbDGo7k2fGBRge6BXkasGVw5Ag6Swh1p7KS96AXwFWWFJsg2MhesGtdn1pFXQmpurtJhxpFipEjt8yuS9L7AHnLHGSkNzAgC5RAZ"
+        },
+        "k": 0,
+        "unspents": [
+          {
+            "txId": "839691f0e681fbfc5f7a3812b616027d6fd74f17540b33cdb78d6e7711c0f6e7",
+            "address": "n1GyUANZand9Kw6hGSV9837cCC9FFUQzQa",
+            "confirmations": 3,
+            "vout": 0,
+            "value": 25000
+          },
+          {
+            "txId": "51241b0849daa625769f186ac5226be81765720145bbfb468e8a2ce49b690279",
+            "address": "n2fiWrHqD6GM5GiEqkbWAc6aaZQp3ba93X",
+            "confirmations": 1,
+            "vout": 1,
+            "value": 175000
+          },
+          {
+            "txId": "a364fbde6ff00ed996b6668bacf60d0a00ca0a31bbdf94127721d2cd3242622c",
+            "address": "n1GyUANZand9Kw6hGSV9837cCC9FFUQzQa",
+            "confirmations": 0,
+            "vout": 0,
+            "value": 300000
+          },
+          {
+            "txId": "7de1555df0c2700329e815b93b32c571c3ea54dc967b89e81ab73b9972b72d1d",
+            "address": "n1GyUANZand9Kw6hGSV9837cCC9FFUQzQa",
+            "confirmations": 0,
+            "vout": 0,
+            "value": 60000
+          }
+        ]
+      }
+    },
+    {
+      "seed": "043c72ff615427ee4daf77b05206abd27de3b7655736539b88ea4e533bbd492d",
+      "network": "litecoin",
+      "balance": 400000,
+      "confirmedBalance": 400000,
+      "transactions": [
+        {
+          "description": "does not overestimate fees when network has dustSoftThreshold",
+          "outputs": [
+            {
+              "address": "Lg6EmeK1sbbfJh2PJQ2NkYwCHM2buUDWjT",
+              "value": 200000
+            }
+          ],
+          "expected": {
+            "txId": "ce3a79d9d3754b23c740b5dd370f5126c6f45d37dbe53f66b046bb27fc547e94",
+            "inputs": [
+              0
+            ],
+            "change": 100000,
+            "fee": 100000
+          }
+        }
+      ],
+      "json": {
+        "external": {
+          "addresses": [
+            "LeyySKbQrRRwodKEj1W4a8y3YQupPLw5os",
+            "LgNiV1WgUj59YxvnJKcRchx1vnBPGD7SgB"
+          ],
+          "map": {
+            "LeyySKbQrRRwodKEj1W4a8y3YQupPLw5os": 0,
+            "LgNiV1WgUj59YxvnJKcRchx1vnBPGD7SgB": 0
+          },
+          "node": "Ltpv76FuomkJfbn4GtvNAEhYPYjWk2A6Nfk7HPmQDpJCyzBVxSF2MrhtkmWyBFzCrFazogiKAzGEeBsdVRSCFo2rzbhVxpzwsdJta918gXQNeZQ"
+        },
+        "internal": {
+          "addresses": [
+            "LSEiBaHCbW4m61Wn2JxyVAuEt9ZeKANb5s",
+            "LY7reDrTS8W1hgpWz9xgshgRmgCHiCb4Rq"
+          ],
+          "map": {
+            "LSEiBaHCbW4m61Wn2JxyVAuEt9ZeKANb5s": 0,
+            "LY7reDrTS8W1hgpWz9xgshgRmgCHiCb4Rq": 1
+          },
+          "node": "Ltpv76FuomkJfbn4MuSi3WcocrnHdiuvMQiVkXZNn5n5q7EhPjy3Pmg7imMZkFEdkz2tMvZurEwct2ppLuJ9WeXAoxXtm2uARvcFL3FTnPAqi9f"
+        },
+        "k": 0,
+        "unspents": [
+          {
+            "txId": "839691f0e681fbfc5f7a3812b616027d6fd74f17540b33cdb78d6e7711c0f6e7",
+            "address": "LeyySKbQrRRwodKEj1W4a8y3YQupPLw5os",
+            "confirmations": 253,
+            "vout": 0,
+            "value": 400000
+          }
+        ]
+      }
+    }
+  ]
+}

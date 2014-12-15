@@ -3,8 +3,11 @@
   "version": "0.0.1",
   "description": "Tradle component bitjoe node implementation",
   "main": "index.js",
+  "bin": {
+    "bitjoe": "./app.js"
+  },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node test/*.js"
   },
   "keywords": [
     "bitcoin",
@@ -19,19 +22,33 @@
   "author": "Mark Vayngrib <mark.vayngrib@lablz.com> (http://github.com/mvayngrib)",
   "license": "MIT",
   "dependencies": {
+    "async": "^0.9.0",
+    "bip32-utils": "^0.2.1",
+    "bip32-wallet": "^0.1.1",
     "bip38": "^1.1.1",
     "bip39": "^2.1.0",
     "bitcoinjs-lib": "^1.4.1",
+    "cb-blockr": "^2.0.0",
+    "cb-helloblock": "^0.4.7",
     "cb-wallet": "^0.6.1",
+    "defaults": "^1.0.0",
+    "elliptic": "^0.15.15",
     "extend": "^2.0.0",
+    "lodash": "^2.4.1",
+    "nedb": "^1.0.0",
+    "prompt": "^0.2.14",
     "secure-random": "^1.1.1"
   },
   "devDependencies": {
     "grunt": "^0.4.5",
+    "grunt-closurecompiler": "^0.9.9",
     "grunt-contrib-jshint": "^0.10.0",
     "grunt-githooks": "^0.3.1",
     "grunt-jsbeautifier": "^0.2.7",
+    "grunt-tape": "0.0.2",
     "jscoverage": "^0.5.9",
-    "load-grunt-tasks": "^1.0.0"
+    "load-grunt-tasks": "^1.0.0",
+    "mocha": "^2.0.1",
+    "tape": "^3.0.3"
   }
 }
