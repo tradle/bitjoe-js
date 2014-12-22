@@ -31,16 +31,17 @@
     "bs58": "^2.0.0",
     "cb-blockr": "^2.0.0",
     "cb-helloblock": "^0.4.7",
-    "cb-wallet": "/Users/tenaciousmv/Code/cb-wallet",
+    "cb-wallet": "^0.6.1",
     "defaults": "^1.0.0",
     "elliptic": "^0.15.15",
     "extend": "^2.0.0",
-    "lodash": "^2.4.1",
+    "lodash-node": "^2.4.1",
     "nedb": "^1.0.0",
     "prompt": "^0.2.14",
     "secure-random": "^1.1.1"
   },
   "devDependencies": {
+    "buffer-equal": "0.0.1",
     "grunt": "^0.4.5",
     "grunt-closurecompiler": "^0.9.9",
     "grunt-contrib-jshint": "^0.10.0",
@@ -49,6 +50,7 @@
     "grunt-tape": "0.0.2",
     "jscoverage": "^0.5.9",
     "load-grunt-tasks": "^1.0.0",
+    "lodash": "^2.4.1",
     "mocha": "^2.0.1",
     "tape": "^3.0.3"
   }

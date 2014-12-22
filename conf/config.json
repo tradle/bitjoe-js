@@ -1,13 +1,13 @@
 {
   "wallet": {
-    "folder": "wallet",
-    "name": "joeWallet",
+    "autosave": true,
+    "path": "wallet/joeWallet.wallet",
     "password": "bogus"
   },
   "prefix": "tradle",
   "maxDataBytes": 40,
   "networkName": "testnet",
-  "allowSpendUnconfirmed": true,
+  "minConf": 0,
   
   "address" : {
     "host": "http://127.0.0.1",
