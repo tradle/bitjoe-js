@@ -24,14 +24,8 @@
     }
   ],
 
-  "keeperAddresses" : [
-    {
-      "host": "http://127.0.0.1",
-      "port": 8008
-    },
-    {
-      "host": "http://127.0.0.1",
-      "port": 8009
-    }
-  ]
+  "keeper" : {
+    "host": "http://127.0.0.1",
+    "port": 8000
+  }
 }

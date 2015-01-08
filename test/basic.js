@@ -34,7 +34,7 @@ test('string <--> buffer conversion', function(t) {
 });
 
 test('aes encrypt/decrypt', function(t) {
-  t.plan(5);
+  t.plan(4);
 
   var str = 'blahblahoiblah';
   var pass = 'password';
@@ -53,7 +53,7 @@ test('aes encrypt/decrypt', function(t) {
   t.ok(bufferEqual(buf, decrypted));
   
   buf = crypto.randomBytes(128);
-  t.ok(bufferEqual(buf, cryptoUtils.fileToBuf(cryptoUtils.fileToString(buf))));
+  // t.ok(bufferEqual(buf, cryptoUtils.fileToBuf(cryptoUtils.fileToString(buf))));
 });
 
 test('ecdh', function(t) {
@@ -68,7 +68,7 @@ test('ecdh', function(t) {
   var ab = cryptoUtils.sharedEncryptionKey(a.d, b.pub);
   var ba = cryptoUtils.sharedEncryptionKey(b.d, a.pub);
 
-  t.equal(ab, ba);
+  t.ok(bufferEqual(ab, ba));
 });
 
 test('transaction data', function(t) {
@@ -89,7 +89,7 @@ test('transaction data', function(t) {
 });
 
 test('permission file', function(t) {
-  t.plan(1);
+  t.plan(2);
 
   var key1 = ECKey.makeRandom();
   var key2 = ECKey.makeRandom();
@@ -98,15 +98,27 @@ test('permission file', function(t) {
   var fileKey = crypto.randomBytes(32);
 
   var permission = new Permission(fileHash, fileKey);
-  permission.encrypt(key1.d, key2.pub);
+  var encryptionKey = cryptoUtils.sharedEncryptionKey(key1.d, key2.pub);
+  var decryptionKey;
+  var decryptedPermission;
+  permission.encrypt(encryptionKey);
 
-  var encryptedPermission = permission.data();
-  var decryptedPermission = Permission.decrypt(key2.d, key1.pub, encryptedPermission);
-  t.ok(_.isEqual(decryptedPermission.body(), permission.body()));
+  permission.build()
+    .then(function() {
+      var encryptedPermission = permission.data();
+      decryptionKey = cryptoUtils.sharedEncryptionKey(key2.d, key1.pub);
+      decryptedPermission = Permission.recover(encryptedPermission, decryptionKey);
+
+      return decryptedPermission.build();
+    })
+    .then(function() {    
+      t.ok(bufferEqual(encryptionKey, decryptionKey));
+      t.ok(_.isEqual(decryptedPermission.body(), permission.body()));
+    });
 });
 
 test('permission file + transaction construction, reconstruction', function(t) {
-  t.plan(7);
+  t.plan(6);
 
   var prefix = 'blah';
   var key1 = ECKey.makeRandom();
@@ -116,39 +128,46 @@ test('permission file + transaction construction, reconstruction', function(t) {
   var fileKey = crypto.randomBytes(32);
 
   var permission = new Permission(fileHash, fileKey);
-  permission.encrypt(key1.d, key2.pub);
+  var encryptionKey = cryptoUtils.sharedEncryptionKey(key1.d, key2.pub);
+  permission.encrypt(encryptionKey);
 
-  var typeCode = TransactionData.types.ENCRYPTED_SHARE;
-  var encryptedPermissionKey = permission.encryptedKey();
+  permission.build()
+  .then(function() {
 
-  var tData = new TransactionData(prefix, typeCode, encryptedPermissionKey);
-  var serialized = tData.serialize();
-  var deserialized = TransactionData.deserialize(serialized, prefix);
+    var typeCode = TransactionData.types.ENCRYPTED_SHARE;
+    var encryptedPermissionKey = permission.encryptedKey();
 
-  // #1
-  t.equal(typeCode, deserialized.type());
+    var tData = new TransactionData(prefix, typeCode, encryptedPermissionKey);
+    var serialized = tData.serialize();
+    var deserialized = TransactionData.deserialize(serialized, prefix);
 
-  var parsedPermissionKey = deserialized.data();
+    // #1
+    t.equal(typeCode, deserialized.type());
 
-  // #2
-  t.ok(bufferEqual(parsedPermissionKey, encryptedPermissionKey));
-  // #3
-  t.ok(bufferEqual(permission.key(), Permission.decryptKey(key2.d, key1.pub, encryptedPermissionKey)));
+    var parsedPermissionKey = deserialized.data();
 
-  var permissionData = permission.data();
-  var permissionDataStr = cryptoUtils.fileToString(permissionData);
-  var decodedPermissionData = cryptoUtils.fileToBuf(permissionDataStr);
+    debugger;
+    // #2
+    t.ok(bufferEqual(parsedPermissionKey, encryptedPermissionKey));
+    // #3
 
-  // #4
-  t.ok(bufferEqual(permissionData, decodedPermissionData));
-  var parsedPermission = Permission.decrypt(key2.d, key1.pub, decodedPermissionData);
+    var decryptionKey = cryptoUtils.sharedEncryptionKey(key2.d, key1.pub);
+    t.ok(bufferEqual(permission.key(), cryptoUtils.decrypt(encryptedPermissionKey, decryptionKey)));
 
-  // #4
-  t.ok(_.isEqual(parsedPermission.body(), permission.body()));
-  // #5
-  t.ok(bufferEqual(fileHash, parsedPermission.fileKeyBuf()));
-  // #6
-  t.ok(bufferEqual(fileKey, parsedPermission.decryptionKeyBuf()));
+    var permissionData = permission.data();
+    var parsedPermission = Permission.recover(permissionData, decryptionKey);
+
+    parsedPermission.ready()
+    .then(function() {
+
+      // #4
+      t.ok(_.isEqual(parsedPermission.body(), permission.body()));
+      // #5
+      t.ok(bufferEqual(fileHash, parsedPermission.fileKeyBuf()));
+      // #6
+      t.ok(bufferEqual(fileKey, parsedPermission.decryptionKeyBuf()));
+    });
+  });
 });
 
 // test('can create an OP_RETURN transaction', function(t) {

@@ -1,13 +1,12 @@
 
 'use strict';
 
+var Q = require('q');
 var EventEmitter = require('events').EventEmitter;
 var common = require('./lib/common');
 var MIN_BALANCE = 1e6;
 var bitcoin = require('bitcoinjs-lib');
-var assert = require('assert');
 var cryptoUtils = require('./lib/crypto');
-var async = require('async');
 var CBWallet = require('cb-wallet');
 var BIP39 = require('bip39');
 var EventEmitter = require('events').EventEmitter;
@@ -19,12 +18,12 @@ var requireOption = common.requireOption;
 var commonBlockchains = require('./lib/commonBlockchains');
 var TransactionData = require('./lib/transactionData');
 var Permission = require('./lib/permission');
-var KeeperAPI = require('./lib/keeperAPI');
+var KeeperAPI = require('bitkeeperAPI');
 var pubsub = require('./lib/pubsub');
+var server = require('./lib/server');
+var debug = require('debug')('bitjoe');
+var Jobs = require('simple-jobs');
 var noop = function() {};
-var log = function() {
-  console.log.apply(console, arguments);
-}
 
 var faucets = {
   TP: 'msj42CCGruhRsFrGATiUuh25dtxYtnpbTx',
@@ -34,71 +33,50 @@ var faucets = {
 module.exports = BitJoe;
 
 function BitJoe(config) {
+  var self = this;
+
   EventEmitter.call(this);
+
   common.bindPrototypeFunctions(this);
 
   this._config = config || {};
+  this._keeper = new KeeperAPI(this.config('keeper'));
+  this._jobs = new Jobs();
 
   // this._promptPassword(function() {  
-    this._loadWallet(this._onInitialized);
+  this._loadWallet()
+    .then(function() {
+      self._walletReady = true;
+      self.checkReady();
+    })
+    .catch(this.exitIfErr);
   // });
+
+  server.create(this, this.port(), function(err, server) {
+    self.exitIfErr(err);
+
+    if (server) self._server = server;
+    self._serverReady = true;
+    self.checkReady();
+  });
 
   this.on('ready', this._onready);
 }
 
 inherits(BitJoe, EventEmitter);
 
-BitJoe.prototype._loadWallet = function(callback) {
-  var self = this;
+BitJoe.prototype.checkReady = function() {
+  if (this._ready) return;
+  if (!this._walletReady) return;
+  if (!this._serverReady) return;
 
-  this._setupStorage();
-  this._keeper = new KeeperAPI(this.config('keeperAddresses')[0]);
-
-  this._blockchain = commonBlockchains(this.networkName());
-  if (this._wallet) {
-    return process.nextTick(function() {
-      self.emit('ready');
-    });
-  }
-
-  var options = extend({ networkName: this.networkName() }, this.config('wallet'));
-  loadOrCreateWallet(options, function(err, wallet, created) {
-    if (err) return callback(err);
-
-    self._initWallet(wallet, callback);
-  });
+  this.emit('ready');
 }
 
-BitJoe.prototype._initWallet = function(wallet, callback) {
-  if (this._wallet) throw new Error('already bound to a wallet');
-
-  var self = this;
-
-  this._wallet = wallet;
-  common.proxyFunctions(this, this._wallet);
-
-  this.scheduleSync();
-  this.sync(function(err) {
-    if (err) return callback(err);
-
-    if (!self.isTestnet() || self.getBalance() >= MIN_BALANCE)
-      return callback();
-
-    self.withdrawFromFaucet(MIN_BALANCE, function(err) {
-      if (err) return callback(err);
-
-      self.sync(callback);
-    });
-  });
-}
-
-BitJoe.prototype._onready = function() { 
+BitJoe.prototype._onready = function() {
   if (this._ready) return;
 
   this._ready = true;
-
-  var addrConfig = this.config('address');
-  log('Running at', addrConfig.host + ':' + addrConfig.port);
 
   var addresses = this.wallet().addresses;
   if (addresses.length < 5) {
@@ -108,16 +86,44 @@ BitJoe.prototype._onready = function() {
   addresses = addresses.slice(addresses.length - 5);
   var pubKeys = addresses.map(this.getPublicKeyForAddress);
 
-  log('Pub keys', pubKeys.map(function(p) { return p.toHex() }));
+  debug('Pub keys', pubKeys.map(function(p) { return p.toHex() }));
+  debug('Send coins to ' + this.currentReceiveAddress());
+  debug('Balance: ' + this.getBalance());
 }
 
-BitJoe.prototype._onInitialized = function(err) {
-  if (err) {
-    log(err);
-    return process.exit();
+BitJoe.prototype._loadWallet = function() {
+  // var self = this;
+
+  this._setupStorage();
+
+  this._blockchain = commonBlockchains(this.networkName());
+  if (this._wallet) {
+    // return process.nextTick(function() {
+    //   self.emit('ready');
+    // });
+    return Q.resolve();
   }
 
-  this.emit('ready');
+  var options = extend({ networkName: this.networkName() }, this.config('wallet'));
+  return loadOrCreateWallet(options)
+            .then(this._initWallet);
+}
+
+BitJoe.prototype._initWallet = function(wallet) {
+  if (this._wallet) throw new Error('already bound to a wallet');
+
+  var self = this;
+
+  this._wallet = wallet;
+  common.proxyFunctions(this, this._wallet);
+
+  this.scheduleSync();
+  return this.sync().then(function() {
+    if (!self.isTestnet() || self.getBalance() >= MIN_BALANCE) return;
+
+    return self.withdrawFromFaucet(MIN_BALANCE)
+               .then(self.sync);
+  });
 }
 
 // BitJoe.prototype._promptPassword = function(callback) {
@@ -167,23 +173,16 @@ BitJoe.prototype.isReady = function() {
 BitJoe.prototype._setupStorage = function() {
   if (this._ready) return;
 
-  var self = this;
-
   var storageConfig = this.config('wallet');
   if (storageConfig.autosave)
     this.autosave(storageConfig.path);
 
-  this._saveQueue = async.queue(this._save, 1);
-  this._saveQueue.drain = function(err) { 
-    if (err) return log(err);
-
-    log('Saved wallet');
-    log('Current balance ' + self.getBalance());
-  }
+  // this._saveQueue = queue(1); // prevent concurrent saves
+  this._savesQueued = [];
 }
 
 BitJoe.prototype.autosave = function(path) {
-  assert(path, 'path is required');
+  requireParam('path', path);
 
   var self = this;
 
@@ -196,63 +195,70 @@ BitJoe.prototype.autosave = function(path) {
   }
 
   var options = defaults({ path: path }, this.config('wallet'));
-  var save = this.queueSave.bind(this, options);
-
-  this.on('sync', save);
   this.on('ready', function() {
-    self._wallet.on('address:new', save);
-    self._wallet.on('transaction:processed', self.fetchPermissions);
-    self.on('permission:downloaded', self.loadFile);
+    self._wallet.on('usedaddress', save);
+    self._wallet.on('transaction:new', save);
+    self._wallet.on('transaction:new', self._onTransaction);
+    self._wallet.on('transaction:update', save);
+    self._wallet.on('transaction:update', self._onTransaction);
+    // self.on('permission:downloaded', self.loadFile);
     self.on('file:downloaded', self.processFile);
   });
+
+  function save() {
+    self.queueSave(options);
+  }
 }
 
-BitJoe.prototype.loadFile = function(permission, callback) {
-  var self = this;
-  var fileKey = permission.fileKeyString();
+BitJoe.prototype.isSentByMe = function(tx) {
+  return tx.ins.map(this.getAddressFromInput)
+               .some(this.getPrivateKeyForAddress);
+}
 
-  callback = callback || noop;
+BitJoe.prototype._onTransaction = function(tx) {
+  debug('Received transaction', tx.getId(), JSON.stringify(this.getMetadata(tx.getId())));
+  debug('Balance (confirmed): ' + this.getBalance(6));
+  debug('Balance (unconfirmed): ' + this.getBalance(0));
 
-  this.fetchFile(fileKey, function(err, file) {
-    if (err)
-      return log('Unable to retrieve file indicated in permission', err);
+  tx = this.getTransaction(tx);
 
-    file = cryptoUtils.fileToBuf(file);
-    var decryptionKey = permission.decryptionKeyBuf();
-    if (decryptionKey)
-      file = cryptoUtils.decrypt(file, decryptionKey).toString();
+  if (this.isSentByMe(tx)) return;
 
-    try {
-      file = JSON.parse(file);
-    } catch (err) {
-      log('File is not in expected (JSON) format: ' + file);
-      return callback(err);
-    }
-
-    self.emit('file:downloaded', file);
-    callback(null, file);
-  });
+  // for debugging purposes only
+  this.loadData([tx])
+    .then(function(file) {
+      debugger;
+    }).catch(function(err) {
+      debugger;
+    });
 }
 
 BitJoe.prototype.processFile = function(file) {
-  log('Received file:', file);
+  debug('Received file:', file);
   pubsub.emit('file', file);
 }
 
 BitJoe.prototype.getTransactionData = function(tx) {
+  tx = this.getTransaction(tx);
   return TransactionData.fromTx(tx, this.config('prefix'));
 }
 
-BitJoe.prototype.getPermissionData = function(tx) {
+/**
+ *  Parses data embedded in tx (in OP_RETURN) and attempts to recover 
+ *  the necessary ingredients for obtaining the permission file (a.k.a. intermediate file)
+ * 
+ *  @return {
+ *    key: <permission key in storage>
+ *    sharedKey: <key to decrypt permission body>
+ *  }
+ */
+BitJoe.prototype.getPermissionData = function(tx, txData) {
   var self = this;
 
-  var wallet = this._wallet;
-  if (typeof tx === 'string')
-    tx = wallet.txGraph.findNodeById(tx).tx;
-
-  var txData = this.getTransactionData(tx);
+  txData = txData || this.getTransactionData(tx);
   if (!txData) return;
 
+  var wallet = this._wallet;
   var myAddress;
   var myPrivKey;
   var theirPubKey;
@@ -260,23 +266,24 @@ BitJoe.prototype.getPermissionData = function(tx) {
   var fromMe = this.getSentFromMe(tx);
   if (fromMe.length) {
     // can't figure out their public key
-    if (toMe.length === tx.outs.length - 1) {
-      tx.ins.some(function(input) {
-        var addr = self.getAddressFromInput(input);
-        myPrivKey = self.getPrivateKeyForAddress(addr);
-        return myPrivKey;
-      });
-
-      toMe.some(function(out) {
-        var addr = bitcoin.Address.fromOutputScript(out.script, self.network()).toString();
-        if (!wallet.isChangeAddress(addr)) {
-          theirPubKey = wallet.getPublicKeyForAddress(addr);
-          return true;
-        }
-      });
+    if (toMe.length !== tx.outs.length - 1) {
+      debug('Unable to process transaction data, don\'t know the public key of the receipient');
+      return;
     }
-    else
-      log('Unable to process transaction data, don\'t know the public key of the receipient');
+
+    tx.ins.some(function(input) {
+      var addr = self.getAddressFromInput(input);
+      myPrivKey = self.getPrivateKeyForAddress(addr);
+      return myPrivKey;
+    });
+
+    toMe.some(function(out) {
+      var addr = bitcoin.Address.fromOutputScript(out.script, self.network()).toString();
+      if (!wallet.isChangeAddress(addr)) {
+        theirPubKey = wallet.getPublicKeyForAddress(addr);
+        return true;
+      }
+    });
 
     // myAddress = self.getAddressFromInput(fromMe[0]);
     // var notToMe = _.difference(tx.outs, toMe);
@@ -290,61 +297,147 @@ BitJoe.prototype.getPermissionData = function(tx) {
 
   if (!myPrivKey || !theirPubKey) return;
 
-  var permissionKey = Permission.decryptKey(myPrivKey, theirPubKey, txData.data());
+  var sharedKey = cryptoUtils.sharedEncryptionKey(myPrivKey, theirPubKey);
+  var permissionKey = cryptoUtils.decrypt(txData.data(), sharedKey);
   return {
-    myPriv: myPrivKey,
-    theirPub: theirPubKey,
-    key: cryptoUtils.toHumanReadableString(permissionKey)
+    key: cryptoUtils.toHumanReadableString(permissionKey),
+    sharedKey: sharedKey
   };
 }
 
-// TODO: batch in one request
-BitJoe.prototype.fetchPermissions = function(txIds, callback) {
-  var self = this;
-
-  var tasks = txIds.map(function(txId) {
-    return function(cb) {
-      self.fetchPermission(txId, cb);
-    }
-  });
-
-  async.parallel(tasks, callback);
-}
-
 /**
- *  @param tx { bitcoin.Transaction || String } transaction or transaction id
- */
-BitJoe.prototype.fetchPermission = function(tx, callback) {
+ *  Optimized data loading with minimum calls to keeper
+ *  @return {Q.Promise} for files related to the passed in transactions/ids
+ **/
+BitJoe.prototype.loadData = function(txIds) {
   var self = this;
-  var permissionData = this.getPermissionData(tx);
 
-  callback = common.asyncify(callback || noop);
-  if (!permissionData) return callback();
+  var txs = txIds.map(this.getTransaction);
+  var txData = txs.map(this.getTransactionData);
+  var permissionData = txData.map(noop); // fill with undefineds
+  var files = permissionData.slice();    // fill with undefineds
+  var keys = txData.map(function(txData, idx) {
+    var key, pData;
 
-  this.fetchFile(permissionData.key, function(err, permissionFile) {
-    if (err) return callback(err);
+    switch (txData.type()) {
+      case TransactionData.types.PUBLIC:
+        key = txData.data();
+        break;
+      case TransactionData.types.CLEARTEXT_STORE:
+      case TransactionData.types.ENCRYPTED_SHARE:
+        pData = permissionData[idx] = self.getPermissionData(txIds[idx], txData);
+        if (!pData) return;
 
-    var permission;
-    try {
-      permission = Permission.decrypt(permissionData.myPriv, permissionData.theirPub, permissionFile);
-    } catch (err) {
-      return callback(err);
+        key = pData.key;
+        break;
     }
-    
-    callback(null, permission);
 
-    self.emit('permission:downloaded', permission);
+    return cryptoUtils.toHumanReadableString(key);
+  });
+
+  keys = compact(keys);
+
+  if (!keys.length) return Q.resolve();
+
+  var idxMap = []; // save indices in {files} we have permissions data for
+  var permissions;
+  return this.fetchFiles(keys)
+  .then(function(results) {
+    // fetch any files that required a permission file (a.k.a. intermediate file)
+    permissions = txData.reduce(function(memo, txData, i) {
+      var data = results[i];
+      if (typeof data === 'undefined' || data === null) return memo;
+
+      var pData = permissionData[i];
+      var decryptionKey;
+      switch (txData.type()) {
+        case TransactionData.types.PUBLIC: // we already have our file
+          files[i] = data;
+          return memo;
+        case TransactionData.types.ENCRYPTED_SHARE:
+          // fall through
+          if (typeof pData === 'undefined') return memo;
+
+          decryptionKey = pData.sharedKey;
+        case TransactionData.types.CLEARTEXT_STORE:
+          idxMap.push(i);
+          debug('Permission ciphertext: ' + data);
+          var permission;
+          try {
+            permission = Permission.recover(data, decryptionKey);
+          } catch (err) {
+            debug('Failed to recover permission file contents from raw data', err);
+            return memo;
+          }
+
+          memo.push(permission);
+          return memo;
+        default:
+          throw new Error('unsupported type');
+      }      
+    }, []);
+
+    if (permissions.length) {
+      self.emit('permissions:downloaded', permissions);
+      var sharedFileKeys = permissions.map(function(p) { 
+        return p.fileKeyString() 
+      });
+
+      return self.fetchFiles(sharedFileKeys);
+    }
+
+    return [];
+  }).then(function(sharedFiles) {
+    // merge permission-based files into files array
+    sharedFiles.forEach(function(file, idx) {
+      var permission = permissions[idx];
+      var decryptionKey = permission.decryptionKeyBuf();
+      if (decryptionKey)
+        file = cryptoUtils.decrypt(file, decryptionKey);
+
+      var fileIdx = idxMap[idx];
+      files[fileIdx] = file;
+    });
+
+    var numFiles = 0;
+    var fileInfos = [];
+    files.forEach(function(f, i) {
+      try {
+        files[i] = JSON.parse(f.toString());
+        fileInfos.push({
+          file: f,
+          permission: permissions[i],
+          tx: txs[i]
+        })
+
+        numFiles++;
+      } catch (err) {
+        debug('Failed to parse file JSON', err);
+        files[i] = null;
+      }
+    });
+
+    if (numFiles) self.emit('files:downloaded', fileInfos);
+
+    return files;
   });
 }
 
-BitJoe.prototype.fetchFile = function(key, callback) {
-  return this._keeper.get(key, function(err, resp, body) {
-    if (err) return callback(err);
+BitJoe.prototype.getTransaction = function(txId) {
+  if (txId.ins && txId.outs) return txId;
 
-    if (resp.statusCode !== 200) return callback(common.httpError(resp.status, 'Failed to retrieve file from keeper'));
+  var node = this._wallet.txGraph.findNodeById(txId);
+  return node && node.tx;
+}
 
-    callback(err, body);
-  });
+BitJoe.prototype.fetchFiles = function(keys) {
+  // if (spread) return Q.allSettled(keys.map(this.fetchFiles));
+
+  return Q.ninvoke(this._keeper, 'getMany', keys)
+    .catch(function(err) {
+      // throw common.httpError(err.code || 400, err.message || 'Failed to retrieve file from keeper');
+      throw err;
+    });
 }
 
 BitJoe.prototype.keeper = function() {
@@ -357,115 +450,114 @@ BitJoe.prototype.getDataTransactions = function() {
 }
 
 BitJoe.prototype.withdrawFromFaucet = function(value, callback) {
-  var self = this;
-
   callback = common.asyncify(callback || noop);
 
   if (!this.isTestnet()) return callback(new Error('can only withdraw from faucet on testnet'));
 
-  commonBlockchains('testnet').addresses.__faucetWithdraw(this.currentReceiveAddress(), value || 1e7, function(err) {
-    if (err) return callback(err);
-
-    self.sync(callback);
-  });
+  var cbAddresses = commonBlockchains('testnet').addresses;
+  return Q.ninvoke(cbAddresses, '__faucetWithdraw', this.currentReceiveAddress(), value || 1e7);
 }
 
 BitJoe.prototype.getBalance = function(minConf) {
   return this._wallet.getBalance(typeof minConf === 'undefined' ? this.config('minConf') : minConf);
 }
 
-BitJoe.prototype.refundToFaucet = function(value, callback) {
+/**
+ * @return Q.Promise for the amount refunded
+ */
+BitJoe.prototype.refundToFaucet = function(value) {
+  if (!this.isTestnet()) 
+    return Q.reject(new Error('Can only return testnet coins'));
+
   var network = bitcoin.networks[this.networkName()];
   var tx = this._wallet.createTx(faucets.TP, network.dustThreshold + 1, 0, 0);
   var maxRefund = this.getBalance() - network.estimateFee(tx);
-
-  callback = common.asyncify(callback || noop);
-  if (maxRefund <= 0) return callback(new Error('Insufficient funds'));
-
-  if (typeof value === 'function') {
-    callback = value;
-    value = maxRefund;
-  }
-
   value = value || maxRefund;
 
-  if (!this.isTestnet()) return callback(new Error('Can only return testnet coins'));
-
-  if (value > maxRefund) return callback(new Error('Can refund at most ' + maxRefund));
+  if (maxRefund <= 0 || value < maxRefund) 
+    return Q.reject(common.httpError(500, 'Insufficient funds'));
 
   tx = this._wallet.createTx(faucets.TP, value, 0, 0);
-  this._wallet.sendTx(tx, function(err) {
-    if (err) return callback(err);
-
-    callback(null, value);
-  });
+  return Q.ninvoke(this._wallet, 'sendTx', tx)
+          .then(function() {
+            debugger;
+            return value;
+          });
 }
 
 BitJoe.prototype.isTestnet = function() {
   return this.networkName() === 'testnet';
-};
+}
 
 BitJoe.prototype.toJSON = function() {
   return this._wallet.serialize();
 }
 
-// BitJoe.fromJSON = function(json) {
-//   return new BitJoe({
-//     wallet: common.walletFromJSON(json)
-//   });
-// }
-
 BitJoe.prototype.scheduleSync = function(interval) {
   this._syncInterval = interval || 60000;
-  if (this._syncIntervalId)
-    clearInterval(this._syncIntervalId);
-
-  this._syncIntervalId = setInterval(this.sync, this._syncInterval);
+  if (!this._jobs.has('sync'))
+    this._jobs.add('sync', this.sync, this._syncInterval);
 }
 
-// BitJoe.prototype.newWallet = function(options, callback) {
-//   options = extend({}, this._config, options);
-//   return newWallet(options, callback);
-// }
-
-BitJoe.prototype.sync = function(cb) {
+BitJoe.prototype.sync = function() {
   var self = this;
-
-  cb = cb || noop;
-  this._wallet.sync(function(err, numUpdates) {
-    if (err) return cb(err);
-
-    if (numUpdates)
-      self.emit('sync');
-    
-    cb();
-  });
+  return Q.ninvoke(this._wallet, 'sync')
+    .then(function(numUpdates) {
+      if (numUpdates) self.emit('sync');
+    });
 }
 
-BitJoe.prototype.queueSave = function(options) {
-  // only queue if we don't have a save queued already
-  assert(options, 'options is a required parameter');
-
-  if (!this._saveQueue.length())
-    this._saveQueue.push(options);
+BitJoe.prototype.exitIfErr = function(err) {
+  if (err) {
+    debugger;
+    debug('Error', err);
+    this.destroy().done(function() {
+      process.exit();
+    });
+  }
 }
 
-/*
-* Adapted from https://github.com/hivewallet/hive-js/blob/master/app/lib/wallet/index.js
-*/
+BitJoe.prototype.destroy = function() {
+  this._jobs.clear();
+  this._savesQueued.length = 0;
+  // TODO add current save task
+
+  var tasks = [
+    Q.ninvoke(this._server, 'close')
+  ];
+
+  return Q.all(tasks);
+}
+
+BitJoe.prototype.queueSave = function(options, callback) {
+  requireParam('options', options);
+  
+  if (this._savesQueued.length) return;
+  if (this._saving) {
+    this._savesQueued.push(arguments);
+    debug('Queued save');
+    return;
+  }
+
+  this._save(options);
+}
+
 BitJoe.prototype._save = function(options, callback) {
   var self = this;
 
-  assert(options && callback, 'both options and callback are required');
-
+  requireParam('options', options);
   var path = requireOption(options, 'path');
+
+  this._saving = true;
+  debug('Saving wallet');
 
   if (options.overwrite === false) {
     fs.exists(path, function(exists) {
       if (exists) return callback(new Error('Wallet file exists, to overwrite specify option: overwrite'));
 
       options = defaults({ overwrite: true }, options);
-      self.queueSave(options, callback);
+      self.queueSave(options);
+      done();
     })
   }
   else {
@@ -477,10 +569,24 @@ BitJoe.prototype._save = function(options, callback) {
       path: path, 
       data: walletStr,
       options: getFileOptions(options)
-    }, callback);
+    }, done);
+  }
+
+  function done(err) {
+    debug('Saved wallet');
+    self._saving = false;
+    
+    if (callback) 
+      callback(err);
+
+    if (self._savesQueued.length) 
+      self._save.apply(self, self._savesQueued.pop());
   }
 }
 
+/**
+ *  @return {Array} outputs in tx that the underlying wallet can spend
+ */
 BitJoe.prototype.getSentToMe = function(tx) {
   var self = this;
   var addresses = this.getAllAddresses();
@@ -491,6 +597,9 @@ BitJoe.prototype.getSentToMe = function(tx) {
   });
 }
 
+/**
+ *  @return {Array} inputs in tx that are signed by the underlying wallet
+ */
 BitJoe.prototype.getSentFromMe = function(tx) {
   var self = this;
   var addresses = this.getAllAddresses();
@@ -521,30 +630,37 @@ BitJoe.prototype.wallet = function() {
   return this._wallet;
 }
 
+BitJoe.prototype.port = function() {
+  return this.config('address').port;
+}
+
 BitJoe.prototype.currentReceiveAddress = function() {
   return this._wallet.getReceiveAddress();
 }
 
-function loadOrCreateWallet(options, callback) {
-  assert(options && callback, 'both options and callback are required');
+function loadOrCreateWallet(options) {
+  requireParam(options, 'options');
 
   var path = requireOption(options, 'path');
   var password = options.password;
+  var deferred = Q.defer();
 
-  fs.readFile(path, getFileOptions(options), function(err, file) {
-    if (err) {
-      if (err.status === 'ENOENT') return callback(err);
-
-      log('Existing wallet not found at specified path, creating a new wallet');
-      newWallet(options, function(err, wallet) {
-        callback(err, wallet, true);
-      });
-    }
-    else {
+  Q.ninvoke(fs, 'readFile', path, getFileOptions(options))
+    .then(function(file) {
       var json = password ? cryptoUtils.decrypt(file, password) : file;
-      callback(null, common.walletFromJSON(json));
-    }
-  });
+      deferred.resolve(common.walletFromJSON(json));
+    })
+    .catch(function(err) {
+      if (err.status === 'ENOENT') throw err;
+
+      debug('Existing wallet not found at specified path, creating a new wallet');
+      newWallet(options)
+        .then(deferred.resolve)
+        .catch(deferred.reject);
+    })
+    .done();
+
+  return deferred.promise;
 }
 
 function getFileOptions(options) {
@@ -557,9 +673,8 @@ function getFileEncoding(passwordProtected) {
   return passwordProtected ? 'base64' : 'utf8';
 }
 
-function newWallet(options, callback) {
+function newWallet(options) {
   options = options || {};
-  callback = callback || noop;
 
   var seed = options.seed;
   var networkName = options.networkName;
@@ -572,8 +687,29 @@ function newWallet(options, callback) {
   }
 
   // return bip32Wallet.fromSeedBuffer(new Buffer(seed, 'hex'), bitcoin.networks[networkName]);
+  var deferred = Q.defer();
   var accounts = cryptoUtils.accountsFromSeed(new Buffer(seed, 'hex'), networkName);
-  var wallet = new CBWallet(accounts.externalAccount, accounts.internalAccount, networkName, function(err) {
-    callback(err, wallet);
+  var wallet = new CBWallet({
+    externalAccount: accounts.externalAccount, 
+    internalAccount: accounts.internalAccount, 
+    networkName: networkName
+  }, function(err) {
+    if (err) return deferred.reject(err);
+
+    deferred.resolve(wallet);
+  });
+
+  return deferred.promise;
+}
+
+function requireParam(paramName, paramValue) {
+  if (typeof paramValue === 'undefined') throw new Error('Missing required parameter: ' + paramName);
+
+  return paramValue;
+}
+
+function compact(arr) {
+  return arr.filter(function(val) {
+    return !!val;
   });
 }
