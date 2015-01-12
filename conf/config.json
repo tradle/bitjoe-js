@@ -9,7 +9,7 @@
   "networkName": "testnet",
   "minConf": 0,
   
-  "address" : {
+  "server" : {
     "host": "http://127.0.0.1",
     "port": 8081
   },

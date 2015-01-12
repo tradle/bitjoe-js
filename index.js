@@ -20,7 +20,8 @@ var TransactionData = require('./lib/transactionData');
 var Permission = require('./lib/permission');
 var KeeperAPI = require('bitkeeperAPI');
 var pubsub = require('./lib/pubsub');
-var server = require('./lib/server');
+var hooks = require('./lib/hooks');
+var server = require('node-bitjoe-server');
 var debug = require('debug')('bitjoe');
 var Jobs = require('simple-jobs');
 var noop = function() {};
@@ -42,6 +43,7 @@ function BitJoe(config) {
   this._config = config || {};
   this._keeper = new KeeperAPI(this.config('keeper'));
   this._jobs = new Jobs();
+  this._hooks = hooks(this);
 
   // this._promptPassword(function() {  
   this._loadWallet()
@@ -51,14 +53,16 @@ function BitJoe(config) {
     })
     .catch(this.exitIfErr);
   // });
+  
+  if (config.server) {
+    server.create(this, this.port(), function(err, server) {
+      self.exitIfErr(err);
 
-  server.create(this, this.port(), function(err, server) {
-    self.exitIfErr(err);
-
-    if (server) self._server = server;
-    self._serverReady = true;
-    self.checkReady();
-  });
+      if (server) self._server = server;
+      self._serverReady = true;
+      self.checkReady();
+    });
+  }
 
   this.on('ready', this._onready);
 }
@@ -68,7 +72,7 @@ inherits(BitJoe, EventEmitter);
 BitJoe.prototype.checkReady = function() {
   if (this._ready) return;
   if (!this._walletReady) return;
-  if (!this._serverReady) return;
+  if (this.config('server') && !this._serverReady) return;
 
   this.emit('ready');
 }
@@ -631,11 +635,19 @@ BitJoe.prototype.wallet = function() {
 }
 
 BitJoe.prototype.port = function() {
-  return this.config('address').port;
+  return this.config('server').port;
 }
 
 BitJoe.prototype.currentReceiveAddress = function() {
   return this._wallet.getReceiveAddress();
+}
+
+BitJoe.prototype.addHooks = function(url/* [event1, event2, ...] */) {
+  return this._hooks.addHooks.apply(this._hooks, arguments);
+}
+
+BitJoe.prototype.removeHooks = function(url/* [event1, event2, ...] */) {
+  return this._hooks.removeHooks.apply(this._hooks, arguments);
 }
 
 function loadOrCreateWallet(options) {
