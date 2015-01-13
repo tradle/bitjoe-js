@@ -9,11 +9,6 @@
   "networkName": "testnet",
   "minConf": 0,
   
-  "server" : {
-    "host": "http://127.0.0.1",
-    "port": 8081
-  },
-  
   "webHookMaxTimeouts": 3,
   
   "webHooks": [

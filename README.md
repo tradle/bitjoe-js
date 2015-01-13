@@ -1,4 +1,4 @@
-node-bitjoe
+bitjoe-js
 ===========
 
-Tradle bitjoe implementation in node
+Tradle bitjoe implementation in JS

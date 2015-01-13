@@ -13,15 +13,14 @@ var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var fs = require('fs');
 var extend = require('extend');
+var TransactionRequest = require('./lib/requests').TransactionRequest;
 var defaults = require('extend');
 var requireOption = common.requireOption;
 var commonBlockchains = require('./lib/commonBlockchains');
 var TransactionData = require('./lib/transactionData');
 var Permission = require('./lib/permission');
 var KeeperAPI = require('bitkeeperAPI');
-var pubsub = require('./lib/pubsub');
 var hooks = require('./lib/hooks');
-var server = require('node-bitjoe-server');
 var debug = require('debug')('bitjoe');
 var Jobs = require('simple-jobs');
 var noop = function() {};
@@ -54,17 +53,8 @@ function BitJoe(config) {
     .catch(this.exitIfErr);
   // });
   
-  if (config.server) {
-    server.create(this, this.port(), function(err, server) {
-      self.exitIfErr(err);
-
-      if (server) self._server = server;
-      self._serverReady = true;
-      self.checkReady();
-    });
-  }
-
   this.on('ready', this._onready);
+  this.on('file:downloaded', this.processFile);
 }
 
 inherits(BitJoe, EventEmitter);
@@ -72,7 +62,6 @@ inherits(BitJoe, EventEmitter);
 BitJoe.prototype.checkReady = function() {
   if (this._ready) return;
   if (!this._walletReady) return;
-  if (this.config('server') && !this._serverReady) return;
 
   this.emit('ready');
 }
@@ -82,9 +71,12 @@ BitJoe.prototype._onready = function() {
 
   this._ready = true;
 
-  var addresses = this.wallet().addresses;
+  var addresses = this.wallet().getAddresses();
   if (addresses.length < 5) {
-    for (var i = 0; i < 5; i++) this.wallet().getNextAddress();
+    addresses = [];
+    for (var i = 0; i < 5; i++) {
+      addresses.push(this.wallet().getNextAddress(i));
+    }
   }
 
   addresses = addresses.slice(addresses.length - 5);
@@ -117,8 +109,10 @@ BitJoe.prototype._initWallet = function(wallet) {
   if (this._wallet) throw new Error('already bound to a wallet');
 
   var self = this;
-
   this._wallet = wallet;
+
+  if (wallet._isNew) this.emit('newwallet', wallet);
+
   common.proxyFunctions(this, this._wallet);
 
   this.scheduleSync();
@@ -148,6 +142,13 @@ BitJoe.prototype._initWallet = function(wallet) {
 //     callback();
 //   });
 // }
+
+/**
+ *  Proxy function to create a new TransactionRequest
+ */
+BitJoe.prototype.transaction = function() {
+  return new TransactionRequest(this);
+}
 
 BitJoe.prototype.wallet = function() {
   return this.wallet();
@@ -192,13 +193,13 @@ BitJoe.prototype.autosave = function(path) {
 
   if (!this._autosavePaths)
     this._autosavePaths = [];
-  else {
-    if (this._autosavePaths.indexOf(path) !== -1) return;
+  else if (this._autosavePaths.indexOf(path) !== -1) 
+    return;
 
-    this._autosavePaths.push(path);
-  }
-
+  this._autosavePaths.push(path);
   var options = defaults({ path: path }, this.config('wallet'));
+  this.on('newwallet', save);
+
   this.on('ready', function() {
     self._wallet.on('usedaddress', save);
     self._wallet.on('transaction:new', save);
@@ -206,7 +207,6 @@ BitJoe.prototype.autosave = function(path) {
     self._wallet.on('transaction:update', save);
     self._wallet.on('transaction:update', self._onTransaction);
     // self.on('permission:downloaded', self.loadFile);
-    self.on('file:downloaded', self.processFile);
   });
 
   function save() {
@@ -219,6 +219,11 @@ BitJoe.prototype.isSentByMe = function(tx) {
                .some(this.getPrivateKeyForAddress);
 }
 
+BitJoe.prototype.isSentToMe = function(tx) {
+  return tx.outs.map(this.getAddressFromOutput)
+                .some(this.getPrivateKeyForAddress);
+}
+
 BitJoe.prototype._onTransaction = function(tx) {
   debug('Received transaction', tx.getId(), JSON.stringify(this.getMetadata(tx.getId())));
   debug('Balance (confirmed): ' + this.getBalance(6));
@@ -226,7 +231,7 @@ BitJoe.prototype._onTransaction = function(tx) {
 
   tx = this.getTransaction(tx);
 
-  if (this.isSentByMe(tx)) return;
+  // if (this.isSentByMe(tx)) return;
 
   // for debugging purposes only
   this.loadData([tx])
@@ -239,7 +244,7 @@ BitJoe.prototype._onTransaction = function(tx) {
 
 BitJoe.prototype.processFile = function(file) {
   debug('Received file:', file);
-  pubsub.emit('file', file);
+  // this.emit('file', file);
 }
 
 BitJoe.prototype.getTransactionData = function(tx) {
@@ -321,6 +326,8 @@ BitJoe.prototype.loadData = function(txIds) {
   var permissionData = txData.map(noop); // fill with undefineds
   var files = permissionData.slice();    // fill with undefineds
   var keys = txData.map(function(txData, idx) {
+    if (!txData) return;
+
     var key, pData;
 
     switch (txData.type()) {
@@ -527,7 +534,7 @@ BitJoe.prototype.destroy = function() {
   // TODO add current save task
 
   var tasks = [
-    Q.ninvoke(this._server, 'close')
+    // Q.ninvoke(this._server, 'close')
   ];
 
   return Q.all(tasks);
@@ -593,11 +600,10 @@ BitJoe.prototype._save = function(options, callback) {
  */
 BitJoe.prototype.getSentToMe = function(tx) {
   var self = this;
-  var addresses = this.getAllAddresses();
 
   return tx.outs.filter(function(out) {
     var address = self.getAddressFromOutput(out);
-    return addresses.indexOf(address) !== -1;
+    return self.getPrivateKeyForAddress(address) && out;
   });
 }
 
@@ -606,11 +612,10 @@ BitJoe.prototype.getSentToMe = function(tx) {
  */
 BitJoe.prototype.getSentFromMe = function(tx) {
   var self = this;
-  var addresses = this.getAllAddresses();
   
   return tx.ins.filter(function(input) {
     var address = self.getAddressFromInput(input);
-    return addresses.indexOf(address) !== -1;
+    return self.getPrivateKeyForAddress(address) && input;
   });
 }
 
@@ -632,10 +637,6 @@ BitJoe.prototype.network = function() {
 
 BitJoe.prototype.wallet = function() {
   return this._wallet;
-}
-
-BitJoe.prototype.port = function() {
-  return this.config('server').port;
 }
 
 BitJoe.prototype.currentReceiveAddress = function() {
@@ -711,6 +712,7 @@ function newWallet(options) {
     deferred.resolve(wallet);
   });
 
+  wallet._isNew = true;
   return deferred.promise;
 }
 
