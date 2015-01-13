@@ -234,12 +234,7 @@ BitJoe.prototype._onTransaction = function(tx) {
   // if (this.isSentByMe(tx)) return;
 
   // for debugging purposes only
-  this.loadData([tx])
-    .then(function(file) {
-      debugger;
-    }).catch(function(err) {
-      debugger;
-    });
+  this.loadData([tx]);
 }
 
 BitJoe.prototype.processFile = function(file) {
@@ -491,7 +486,6 @@ BitJoe.prototype.refundToFaucet = function(value) {
   tx = this._wallet.createTx(faucets.TP, value, 0, 0);
   return Q.ninvoke(this._wallet, 'sendTx', tx)
           .then(function() {
-            debugger;
             return value;
           });
 }
@@ -520,7 +514,6 @@ BitJoe.prototype.sync = function() {
 
 BitJoe.prototype.exitIfErr = function(err) {
   if (err) {
-    debugger;
     debug('Error', err);
     this.destroy().done(function() {
       process.exit();
