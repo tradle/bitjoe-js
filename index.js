@@ -82,9 +82,9 @@ BitJoe.prototype._onready = function() {
   addresses = addresses.slice(addresses.length - 5);
   var pubKeys = addresses.map(this.getPublicKeyForAddress);
 
+  console.log('Send coins to ' + this.currentReceiveAddress());
+  console.log('Balance: ' + this.getBalance());
   debug('Pub keys', pubKeys.map(function(p) { return p.toHex() }));
-  debug('Send coins to ' + this.currentReceiveAddress());
-  debug('Balance: ' + this.getBalance());
 }
 
 BitJoe.prototype._loadWallet = function() {
@@ -514,7 +514,7 @@ BitJoe.prototype.sync = function() {
 
 BitJoe.prototype.exitIfErr = function(err) {
   if (err) {
-    debug('Error', err);
+    console.log('Error', err);
     this.destroy().done(function() {
       process.exit();
     });
@@ -553,7 +553,7 @@ BitJoe.prototype._save = function(options, callback) {
   var path = requireOption(options, 'path');
 
   this._saving = true;
-  debug('Saving wallet');
+  console.log('Saving wallet');
 
   if (options.overwrite === false) {
     fs.exists(path, function(exists) {
@@ -577,7 +577,7 @@ BitJoe.prototype._save = function(options, callback) {
   }
 
   function done(err) {
-    debug('Saved wallet');
+    console.log('Saved wallet');
     self._saving = false;
     
     if (callback) 
@@ -659,7 +659,7 @@ function loadOrCreateWallet(options) {
     .catch(function(err) {
       if (err.status === 'ENOENT') throw err;
 
-      debug('Existing wallet not found at specified path, creating a new wallet');
+      console.log('Existing wallet not found at specified path, creating a new wallet');
       newWallet(options)
         .then(deferred.resolve)
         .catch(deferred.reject);
