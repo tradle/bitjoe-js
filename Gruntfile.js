@@ -5,6 +5,10 @@ module.exports = function(grunt) {
 
   require('load-grunt-tasks')(grunt);
 
+  grunt.registerTask('setup', [
+    'githooks'
+  ]);
+
   grunt.registerTask('default', [
     'jshint',
     'tape'

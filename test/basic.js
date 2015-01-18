@@ -7,9 +7,20 @@ var crypto = require('crypto');
 var TransactionData = require('../lib/transactionData');
 var Permission = require('../lib/permission');
 var bitcoin = require('bitcoinjs-lib');
-var _ = require('lodash');
 var bufferEqual = require('buffer-equal');
+var equals = require('equals');
 var ECKey = bitcoin.ECKey;
+
+function size(obj) {
+  if (Array.isArray(obj)) return obj.length;
+
+  var i = 0;
+  for (var p in obj) {
+    if (obj.hasOwnProperty(p)) i++;
+  }
+
+  return i;
+}
 
 test('string <--> buffer conversion', function(t) {
   t.plan(2);
@@ -66,7 +77,7 @@ test('ecdh', function(t) {
 });
 
 test('transaction data', function(t) {
-  t.plan(_.size(TransactionData.types) * 2);
+  t.plan(size(TransactionData.types) * 2);
 
   var prefix = 'blah';
   for (var type in TransactionData.types) {
@@ -107,7 +118,7 @@ test('permission file', function(t) {
     })
     .then(function() {    
       t.ok(bufferEqual(encryptionKey, decryptionKey));
-      t.ok(_.isEqual(decryptedPermission.body(), permission.body()));
+      t.ok(equals(decryptedPermission.body(), permission.body()));
     });
 });
 
@@ -153,7 +164,7 @@ test('permission file + transaction construction, reconstruction', function(t) {
     parsedPermission.build()
     .then(function() {
       // #4
-      t.ok(_.isEqual(parsedPermission.body(), permission.body()));
+      t.ok(equals(parsedPermission.body(), permission.body()));
       // #5
       t.ok(bufferEqual(fileHash, parsedPermission.fileKeyBuf()));
       // #6
