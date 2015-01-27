@@ -2,3 +2,4 @@ node_modules
 *.sublime-*
 *.min.js
 *.min.css
+.js*

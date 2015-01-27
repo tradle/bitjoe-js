@@ -323,7 +323,6 @@ BitJoe.prototype.getPermissionData = function (tx, txData) {
 BitJoe.prototype.loadData = function (txIds) {
   var self = this;
 
-  var wallet = this.wallet();
   var txs = txIds.map(this.getTransaction);
   var txData = txs.map(this.getTransactionData);
   var permissionData = txData.map(noop); // fill with undefineds
