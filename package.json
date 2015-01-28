@@ -4,14 +4,14 @@
   "description": "Tradle bitjoe component in JS",
   "main": "index.js",
   "scripts": {
-    "postinstall": "cp node_modules/tradle-style/.js* .",
-    "jsbeautify": "js-beautify -r **.js",
-    "jshint": "jshint --exclude-path=.gitignore **.js",
+    "jsbeautify": "js-beautify -r {*.js,lib/*.js,lib/**/*.js,test/*.js} --config node_modules/tradle-style/.jsbeautifyrc",
+    "jshint": "jshint {*.js,**/*.js} --config node_modules/tradle-style/.jshintrc --exclude-path=.gitignore",
+    "jscs": "jscs {*.js,**/*.js} --config node_modules/tradle-style/.jscsrc",
     "test": "node test/*.js"
   },
   "pre-commit": [
     "test",
-    "jsbeautify",
+    "jscs",
     "jshint"
   ],
   "keywords": [
