@@ -1,6 +1,6 @@
 'use strict';
 
-var test = require('tape');
+var taptest = require('tape');
 var cryptoUtils = require('../lib/crypto');
 var crypto = require('crypto');
 var TransactionData = require('../lib/transactionData');
@@ -21,7 +21,7 @@ function size(obj) {
   return i;
 }
 
-test('string <--> buffer conversion', function(t) {
+taptest('string <--> buffer conversion', function(t) {
   t.plan(2);
 
   var buf = crypto.randomBytes(128);
@@ -37,7 +37,7 @@ test('string <--> buffer conversion', function(t) {
   t.equal(str, recoveredStr);
 });
 
-test('aes encrypt/decrypt', function(t) {
+taptest('aes encrypt/decrypt', function(t) {
   t.plan(4);
 
   var str = 'blahblahoiblah';
@@ -60,7 +60,7 @@ test('aes encrypt/decrypt', function(t) {
   // t.ok(bufferEqual(buf, cryptoUtils.fileToBuf(cryptoUtils.fileToString(buf))));
 });
 
-test('ecdh', function(t) {
+taptest('ecdh', function(t) {
   t.plan(1);
 
   var a = ECKey.makeRandom();
@@ -75,7 +75,7 @@ test('ecdh', function(t) {
   t.ok(bufferEqual(ab, ba));
 });
 
-test('transaction data', function(t) {
+taptest('transaction data', function(t) {
   t.plan(size(TransactionData.types) * 2);
 
   var prefix = 'blah';
@@ -92,7 +92,7 @@ test('transaction data', function(t) {
   }
 });
 
-test('permission file', function(t) {
+taptest('permission file', function(t) {
   t.plan(2);
 
   var key1 = ECKey.makeRandom();
@@ -121,7 +121,7 @@ test('permission file', function(t) {
     });
 });
 
-test('permission file + transaction construction, reconstruction', function(t) {
+taptest('permission file + transaction construction, reconstruction', function(t) {
   t.plan(6);
 
   var prefix = 'blah';

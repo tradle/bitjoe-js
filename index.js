@@ -362,6 +362,7 @@ BitJoe.prototype.loadData = function(txIds) {
         var data = results[i];
         if (typeof data === 'undefined' || data === null) return memo;
 
+        console.log('tx:', common.getTransactionUrl(self.networkName(), txs[i]));
         self.saveIfNew(data, txs[i]);
         var pData = permissionData[i];
         var decryptionKey;

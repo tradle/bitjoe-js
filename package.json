@@ -43,6 +43,7 @@
     "extend": "^2.0.0",
     "parse-torrent": "^2.3.0",
     "q": "^1.1.2",
+    "request": "^2.51.0",
     "secure-random": "^1.1.1",
     "simple-jobs": "git://github.com/tradle/simple-jobs.git",
     "tradle-utils": "git://github.com/tradle/tradle-utils.git"
