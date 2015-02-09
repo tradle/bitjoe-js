@@ -9,6 +9,10 @@ var bitcoin = require('bitcoinjs-lib');
 var bufferEqual = require('buffer-equal');
 var equals = require('equals');
 var ECKey = bitcoin.ECKey;
+var fakeKeeper = require('./fakeKeeper');
+var Scanner = require('../lib/scanner');
+var DataLoader = require('../lib/dataLoader');
+var app = require('./fixtures/app');
 
 function size(obj) {
   if (Array.isArray(obj)) return obj.length;
@@ -21,43 +25,19 @@ function size(obj) {
   return i;
 }
 
-taptest('string <--> buffer conversion', function(t) {
+taptest('aes encrypt/decrypt', function(t) {
   t.plan(2);
 
-  var buf = crypto.randomBytes(128);
-  var str = buf.toString('binary');
-  var recoveredBuf = new Buffer(str, 'binary');
-
-  t.ok(bufferEqual(buf, recoveredBuf));
-
-  str = 'oh the blah blah';
-  buf = new Buffer(str, 'binary');
-  var recoveredStr = buf.toString('binary');
-
-  t.equal(str, recoveredStr);
-});
-
-taptest('aes encrypt/decrypt', function(t) {
-  t.plan(4);
-
-  var str = 'blahblahoiblah';
-  var pass = 'password';
-  var encrypted = cryptoUtils.encrypt(str, pass);
-  var decrypted = cryptoUtils.decrypt(encrypted, pass);
-
-  t.notEqual(str, encrypted);
-  t.equal(str, decrypted);
-
   var buf = crypto.randomBytes(32);
-  pass = crypto.randomBytes(32);
-  encrypted = cryptoUtils.encrypt(buf, pass);
-  decrypted = cryptoUtils.decrypt(encrypted, pass);
+  var key = crypto.randomBytes(32);
+  var encrypted = cryptoUtils.encrypt(buf, key);
+  var decrypted = cryptoUtils.decrypt(encrypted, key);
 
   t.ok(!bufferEqual(buf, encrypted));
   t.ok(bufferEqual(buf, decrypted));
 
   buf = crypto.randomBytes(128);
-  // t.ok(bufferEqual(buf, cryptoUtils.fileToBuf(cryptoUtils.fileToString(buf))));
+  // t.ok(bufferEqual(buf, utils.fileToBuf(utils.fileToString(buf))));
 });
 
 taptest('ecdh', function(t) {
@@ -170,4 +150,55 @@ taptest('permission file + transaction construction, reconstruction', function(t
           t.ok(bufferEqual(fileKey, parsedPermission.decryptionKeyBuf()));
         }, t.fail)
     });
+});
+
+taptest('scan blockchain for public data', function(t) {
+  var models = app.models.bodies;
+  var map = {};
+  [
+    '8e2b8d39cf77de22a028e26769003b29a43348ac',
+    'f89ad154207d45ef031601fe50b270ca27a811f3'
+  ].forEach(function(key, i) {
+    map[key] = models[i];
+  })
+
+  // same file stored 4 times
+
+  var numFiles = Object.keys(map).length;
+  t.plan(numFiles);
+
+  var scanner = new Scanner({
+      keeper: fakeKeeper.forMap(map),
+      networkName: 'testnet',
+      prefix: 'tradle'
+    })
+    .from(321997)
+    .to(322003)
+    .scan(function(err) {
+      t.error(err);
+    })
+    .on('file:public', function(file, fileKey) {
+      t.deepEqual(file, map[fileKey]);
+      if (--numFiles === 0) {
+        scanner.stop();
+      }
+    })
+});
+
+taptest('load app models from list of model-creation tx ids', function(t) {
+  t.plan(1);
+
+  var models = app.models.bodies
+  fakeKeeper.forData(models)
+    .then(function(keeper) {
+      var loader = new DataLoader({
+        networkName: 'testnet',
+        keeper: keeper
+      });
+
+      return loader.load(app.models.txIds);
+    })
+    .then(function(_models) {
+      t.deepEqual(_models, models);
+    })
 });
