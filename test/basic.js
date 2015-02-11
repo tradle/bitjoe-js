@@ -9,7 +9,7 @@ var bitcoin = require('bitcoinjs-lib');
 var bufferEqual = require('buffer-equal');
 var equals = require('equals');
 var ECKey = bitcoin.ECKey;
-var fakeKeeper = require('./fakeKeeper');
+var fakeKeeper = require('./helpers/fakeKeeper');
 var Scanner = require('../lib/scanner');
 var DataLoader = require('../lib/dataLoader');
 var app = require('./fixtures/app');
@@ -188,7 +188,7 @@ taptest('scan blockchain for public data', function(t) {
 taptest('load app models from list of model-creation tx ids', function(t) {
   t.plan(1);
 
-  var models = app.models.bodies
+  var models = app.models.bodies;
   fakeKeeper.forData(models)
     .then(function(keeper) {
       var loader = new DataLoader({

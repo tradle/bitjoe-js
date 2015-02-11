@@ -7,10 +7,11 @@
   "prefix": "tradle",
   "maxDataBytes": 40,
   "networkName": "testnet",
+  "autofund": true,
   "minConf": 0,
-  
+
   "webHookMaxTimeouts": 3,
-  
+
   "webHooks": [
     {
       "url": "http://127.0.0.1:8880",

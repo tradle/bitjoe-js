@@ -4,7 +4,7 @@ var utils = require('tradle-utils');
 
 function keeperForMap(map) {
   return {
-    putOne: function(key, val) {
+    put: function(key, val) {
       var numPut = 0;
       if (!(key in map)) {
         map[key] = val;
@@ -26,6 +26,9 @@ function keeperForMap(map) {
     },
     close: function() {
       return Q.resolve();
+    },
+    isKeeper: function() {
+      return true;
     }
   }
 }
