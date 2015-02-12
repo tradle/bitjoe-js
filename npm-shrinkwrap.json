@@ -387,7 +387,7 @@
             },
             "inherits": {
               "version": "2.0.1",
-              "from": "inherits@>=2.0.1 <2.1.0",
+              "from": "inherits@>=2.0.1 <3.0.0",
               "resolved": "https://registry.npmjs.org/inherits/-/inherits-2.0.1.tgz"
             },
             "pbkdf2-compat": {
@@ -457,7 +457,7 @@
     },
     "bitkeeper-client-js": {
       "version": "0.0.1",
-      "from": "../../../../var/folders/ty/79wqqmzs5jz0kxs0fdtrg_zm0000gn/T/npm-23719-b1cc28a4/git-cache-78023d472769/8023434990f3d0a9cd9072fb91f12f394ab3dcad",
+      "from": "../../../../var/folders/ty/79wqqmzs5jz0kxs0fdtrg_zm0000gn/T/npm-29603-7868a21f/git-cache-570aacb8b63a/8023434990f3d0a9cd9072fb91f12f394ab3dcad",
       "resolved": "git://github.com/tradle/bitkeeper-client-js.git#8023434990f3d0a9cd9072fb91f12f394ab3dcad",
       "dependencies": {
         "request": {
@@ -982,7 +982,7 @@
                 },
                 "inherits": {
                   "version": "2.0.1",
-                  "from": "inherits@>=2.0.0 <3.0.0",
+                  "from": "inherits@>=2.0.1 <2.1.0",
                   "resolved": "https://registry.npmjs.org/inherits/-/inherits-2.0.1.tgz"
                 }
               }
@@ -993,7 +993,7 @@
     },
     "cb-wallet": {
       "version": "0.7.1",
-      "from": "../../../../var/folders/ty/79wqqmzs5jz0kxs0fdtrg_zm0000gn/T/npm-23719-b1cc28a4/git-cache-964365d13ba6/eb3ce6a8fe2860650753ed936285c2bc09f3337a",
+      "from": "../../../../var/folders/ty/79wqqmzs5jz0kxs0fdtrg_zm0000gn/T/npm-29603-7868a21f/git-cache-fc9912b94e6c/eb3ce6a8fe2860650753ed936285c2bc09f3337a",
       "resolved": "git://github.com/tradle/cb-wallet.git#eb3ce6a8fe2860650753ed936285c2bc09f3337a",
       "dependencies": {
         "async": {
@@ -1008,7 +1008,7 @@
         },
         "bitcoin-tx-graph": {
           "version": "4.0.3",
-          "from": "../../../../var/folders/ty/79wqqmzs5jz0kxs0fdtrg_zm0000gn/T/npm-23719-b1cc28a4/git-cache-938904fe677d/4718179e2611f14f207c06a1c9b69eb1f7b9da00",
+          "from": "../../../../var/folders/ty/79wqqmzs5jz0kxs0fdtrg_zm0000gn/T/npm-29603-7868a21f/git-cache-2bdff15318af/4718179e2611f14f207c06a1c9b69eb1f7b9da00",
           "resolved": "git://github.com/tradle/bitcoin-transaction-graph.git#4718179e2611f14f207c06a1c9b69eb1f7b9da00"
         },
         "deep-equal": {
@@ -1091,7 +1091,7 @@
             },
             "inherits": {
               "version": "2.0.1",
-              "from": "inherits@>=2.0.1 <2.1.0",
+              "from": "inherits@>=2.0.0 <2.1.0",
               "resolved": "https://registry.npmjs.org/inherits/-/inherits-2.0.1.tgz"
             },
             "typedarray-to-buffer": {
@@ -1125,7 +1125,7 @@
           "dependencies": {
             "inherits": {
               "version": "2.0.1",
-              "from": "inherits@>=2.0.0 <2.1.0",
+              "from": "inherits@>=2.0.1 <3.0.0",
               "resolved": "https://registry.npmjs.org/inherits/-/inherits-2.0.1.tgz"
             }
           }
@@ -1224,7 +1224,7 @@
         },
         "inherits": {
           "version": "2.0.1",
-          "from": "inherits@>=2.0.1 <2.1.0",
+          "from": "inherits@>=2.0.1 <3.0.0",
           "resolved": "https://registry.npmjs.org/inherits/-/inherits-2.0.1.tgz"
         }
       }
