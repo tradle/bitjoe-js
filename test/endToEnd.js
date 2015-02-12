@@ -18,9 +18,6 @@ taptest('setup bitjoe', function(t) {
   var config = {
     wallet: {
       autosave: false
-      // ,
-      // path: 'wallet/joeWallet.wallet',
-      // password: 'bogus'
     },
     keeper: sharedKeeper,
     prefix: 'test',
@@ -30,16 +27,12 @@ taptest('setup bitjoe', function(t) {
   };
 
   for (var i = 0; i < numJoes; i++) {
-    var conf = extend(true, {
-      autofund: i === 0
-    }, config);
-
-    // conf.wallet.path = conf.wallet.path.replace('.wallet', i + '.wallet');
+    var conf = extend(true, {}, config);
     joes.push(new Joe(conf));
   }
 
   tasks = joes.map(function(joe, i) {
-    if (joe.config('autofund')) return promiseFund(joe);
+    if (i === 0) return promiseFund(joe);
     else return promiseReady(joe);
   })
 
@@ -88,7 +81,7 @@ taptest('create a shared encrypted file, load it', function(t) {
   var sender = joes[0];
   var recipients = joes.slice(1);
   console.log('Creating a new file and sharing it');
-  console.warn('This make take a minute or two');
+  console.warn('This make take a minute');
   var recipientPubKeys = recipients.map(function(joe) {
     var addr = joe.getNextAddress();
     var pubKey = joe.getPublicKeyForAddress(addr);
@@ -190,21 +183,25 @@ taptest('cleanup', function(t) {
     })
 });
 
-function promiseFund(joe) {
-  var fundDefer = Q.defer();
-  joe.on('ready', checkBalance);
-  joe.on('sync', checkBalance);
-  return fundDefer.promise;
+function promiseFund(joe, amount) {
+  return Q.Promise(function(resolve, reject) {
+    amount = amount || 1e5;
+    joe.on('ready', function() {
+      recharge(joe, 1e5);
+    });
 
-  function checkBalance() {
-    var balance = joe.getBalance(0);
-    if (balance < 10000) return;
+    joe.on('sync', checkBalance);
 
-    console.log('Funded from faucet: ' + balance);
-    joe.removeListener('sync', checkBalance);
-    joe.removeListener('ready', checkBalance);
-    fundDefer.resolve();
-  }
+    function checkBalance() {
+      var balance = joe.getBalance(0);
+      if (balance < amount) return;
+
+      console.log('Funded from faucet: ' + balance);
+      joe.removeListener('sync', checkBalance);
+      joe.removeListener('ready', checkBalance);
+      resolve();
+    }
+  });
 }
 
 function promiseReady(joe) {
@@ -221,7 +218,7 @@ function endIn(t, timeout) {
   }, timeout); // hack to throttle common-blockchain api calls
 }
 
-function recharge(joe) {
-  return joe.withdrawFromFaucet(1e5)
+function recharge(joe, satoshis) {
+  return joe.withdrawFromFaucet(satoshis || 1e5)
     .then(joe.sync);
 }
