@@ -10,9 +10,9 @@ var fakeKeeper = require('./helpers/fakeKeeper');
 var bufferEqual = require('buffer-equal');
 var extend = require('extend');
 var joes = [];
+var numJoes = 2;
 
 taptest('setup bitjoe', function(t) {
-  var numJoes = 2;
   var tasks;
   var sharedKeeper = fakeKeeper.forMap({});
   var config = {
@@ -25,7 +25,7 @@ taptest('setup bitjoe', function(t) {
     keeper: sharedKeeper,
     prefix: 'test',
     networkName: 'testnet',
-    syncInterval: 5000,
+    syncInterval: 10000,
     minConf: 0
   };
 
@@ -44,11 +44,7 @@ taptest('setup bitjoe', function(t) {
   })
 
   Q.all(tasks)
-    .catch(function(err) {
-      t.error(err);
-      joes = null;
-    })
-    .finally(function() {
+    .done(function() {
       t.end();
     })
 });
@@ -76,14 +72,10 @@ taptest('create a public file, load it', function(t) {
     })
     .then(function(storedFile) {
       t.ok(bufferEqual(storedFile, fileBuf));
+      return recharge(joe);
     })
-    .catch(function(err) {
-      throw err;
-    })
-    .finally(function() {
-      setTimeout(function() {
-        t.end()
-      }, 10000); // hack to throttle common-blockchain api calls
+    .done(function() {
+      endIn(t, 10000); // throttle
     })
 });
 
@@ -95,11 +87,11 @@ taptest('create a shared encrypted file, load it', function(t) {
   var file = app.models.bodies[0];
   var sender = joes[0];
   var recipients = joes.slice(1);
+  console.log('Creating a new file and sharing it');
+  console.warn('This make take a minute or two');
   var recipientPubKeys = recipients.map(function(joe) {
     var addr = joe.getNextAddress();
     var pubKey = joe.getPublicKeyForAddress(addr);
-    console.log('Sharing with: ' + addr + ' : ' + pubKey.toHex());
-    console.warn('This make take a minute or two');
     return pubKey;
   });
 
@@ -109,11 +101,8 @@ taptest('create a shared encrypted file, load it', function(t) {
     .data(file)
     .shareWith(recipientPubKeys)
     .execute()
-    .then(function(resp) {
+    .done(function(resp) {
       createResp = resp;
-    })
-    .catch(function(err) {
-      throw err;
     });
 
   recipients.forEach(function(joe) {
@@ -128,31 +117,77 @@ taptest('create a shared encrypted file, load it', function(t) {
     joe.once('file:shared', function(file, fileKey) {
       t.equal(fileKey, createResp.fileKey);
 
-      if (--numToGo === 0) t.end();
+      if (--numToGo > 0) return;
+
+      recharge(joe)
+        .done(function() {
+          endIn(t, 10000); // throttle
+        })
     });
 
     joe.on('error', t.error);
   });
+});
 
+taptest('share an existing file with someone new', function(t) {
+  if (!joes) return t.end();
+
+  t.timeoutAfter(200000);
+
+  var file = app.models.bodies[1];
+  var createResp;
+  var shareResp;
+  var sender = joes[0];
+  var recipient = joes[1];
+  var recipientAddr = recipient.getNextAddress();
+  var recipientPubKey = recipient.getPublicKeyForAddress(recipientAddr).toHex();
+  console.log('Sharing existing file with: ' + recipientAddr + ' : ' + recipientPubKey);
+  console.warn('This make take a minute or two');
+
+  var createReq = sender.create().data(file);
+  createReq.execute()
+    .then(function(resp) {
+      createResp = resp;
+      var defer = Q.defer();
+      // throttle
+      setTimeout(function() {
+        return sender.share()
+          .shareAccessWith(recipientPubKey)
+          .shareAccessTo(createResp.fileKey, createReq._symmetricKey)
+          .execute()
+          .done(defer.resolve);
+      }, 10000);
+
+      return defer.promise;
+    })
+    .done(function(resp) {
+      shareResp = resp;
+    });
+
+  recipient.once('file:permission', function(file, fileKey) {
+    var permission = shareResp.permissions[recipientPubKey];
+    t.ok(permission);
+    t.equal(fileKey, permission.key);
+  });
+
+  recipient.once('file:shared', function(file, fileKey) {
+    t.equal(fileKey, createResp.fileKey);
+    endIn(t, 10000); // throttle
+  });
+
+  sender.on('error', t.error);
+  recipient.on('error', t.error);
 });
 
 taptest('cleanup', function(t) {
   if (!joes) return t.end();
 
   Q.all(joes.map(function(joe) {
-    // if (joe.getBalance(0) === 0) return Q.resolve();
-
-    // return joe.refundToFaucet()
-    //   .then(joe.destroy)
-    // }))
       return joe.destroy();
     }))
-    .catch(function(err) {
-      throw err;
-    })
-    .finally(function() {
+    .done(function() {
       t.end();
-    });
+    })
 });
 
 function promiseFund(joe) {
@@ -176,4 +211,17 @@ function promiseReady(joe) {
   var defer = Q.defer();
   joe.once('ready', defer.resolve);
   return defer.promise;
+}
+
+function endIn(t, timeout) {
+  console.log('Throttling common-blockchain calls');
+  setTimeout(function() {
+    console.log('Ready for more common-blockchain calls');
+    t.end()
+  }, timeout); // hack to throttle common-blockchain api calls
+}
+
+function recharge(joe) {
+  return joe.withdrawFromFaucet(1e5)
+    .then(joe.sync);
 }

@@ -7,12 +7,14 @@
     "jsbeautify": "js-beautify -r {*.js,lib/*.js,lib/**/*.js,test/*.js} --config node_modules/tradle-style/.jsbeautifyrc",
     "jshint": "jshint {*.js,**/*.js} --config node_modules/tradle-style/.jshintrc --exclude-path=.gitignore",
     "jscs": "jscs {*.js,**/*.js} --config node_modules/tradle-style/.jscsrc",
-    "test": "node test"
+    "test": "node test",
+    "test-offline": "node test/basic.js",
+    "test-online": "node test/endToEnd.js"
   },
   "pre-commit": [
     "jscs",
     "jshint",
-    "test"
+    "test-offline"
   ],
   "repository": {
     "type": "git",
