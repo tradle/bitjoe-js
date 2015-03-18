@@ -219,6 +219,6 @@ function endIn(t, timeout) {
 }
 
 function recharge(joe, satoshis) {
-  return joe.withdrawFromFaucet(satoshis || 1e5)
+  return joe.charge(1, satoshis || 1e5)
     .then(joe.sync);
 }

@@ -63,6 +63,9 @@ function values(obj) {
 }
 
 module.exports = {
+  empty: function() {
+    return keeperForMap({});
+  },
   forMap: keeperForMap,
   forData: keeperForData
 }

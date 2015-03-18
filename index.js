@@ -3,8 +3,7 @@
 var Q = require('q');
 var EventEmitter = require('events').EventEmitter;
 var common = require('./lib/common');
-var dezalgo = require('dezalgo');
-var MIN_BALANCE = 1e6;
+var MIN_BALANCE = 1e5;
 var bitcoin = require('bitcoinjs-lib');
 var cryptoUtils = require('./lib/crypto');
 var CBWallet = require('cb-wallet');
@@ -26,7 +25,7 @@ var DataLoader = require('./lib/dataLoader');
 var reemit = require('re-emitter');
 var requireOption = utils.requireOption;
 var requireParam = utils.requireParam;
-var noop = function() {};
+var Charger = require('testnet-charger');
 
 var faucets = {
   TP: 'msj42CCGruhRsFrGATiUuh25dtxYtnpbTx',
@@ -42,6 +41,7 @@ function BitJoe(config) {
 
   utils.bindPrototypeFunctions(this);
 
+  this._plugins = Object.create(null);
   this._config = config || {};
   var keeper = this.config('keeper');
   this._keeper = keeper.isKeeper ? keeper : new KeeperAPI(keeper);
@@ -61,7 +61,6 @@ function BitJoe(config) {
   // });
 
   this.on('ready', this._onready);
-  this.on('file:downloaded', this.processFile);
 }
 
 inherits(BitJoe, EventEmitter);
@@ -87,6 +86,8 @@ BitJoe.prototype._onready = function() {
     'file', 'file:public', 'file:shared', 'file:permission', 'permissions:downloaded', 'files:downloaded'
   ]);
 
+  this.on('file', this.processIncomingFile);
+
   // test mode
   console.log('Balance: ' + this.getBalance());
   console.log('Fund me at ' + this.currentReceiveAddress());
@@ -107,8 +108,6 @@ BitJoe.prototype._onready = function() {
 }
 
 BitJoe.prototype._loadWallet = function() {
-  // var self = this;
-
   this._setupStorage();
 
   this._blockchain = commonBlockchains(this.networkName());
@@ -144,8 +143,7 @@ BitJoe.prototype._initWallet = function(wallet) {
   return this.sync()
     .then(function() {
       if (autofund && self.isTestnet() && self.getBalance(0) < MIN_BALANCE) {
-        return self.withdrawFromFaucet(MIN_BALANCE)
-          .then(self.sync);
+        return self.getFunded(typeof autofund === 'number' ? autofund : MIN_BALANCE);
       }
     });
 }
@@ -169,6 +167,80 @@ BitJoe.prototype._initWallet = function(wallet) {
 //   });
 // }
 
+BitJoe.prototype.plugin = function(type, plugin) {
+  var self = this;
+
+  if (arguments.length === 1) {
+    var types = plugin.types;
+    if (!types) throw new Error('Specify parameter "type" or define a "types" property on the plugin');
+
+    types.forEach(function(type) {
+      self.plugin(type, plugin);
+    });
+  }
+
+  var plugins = this._plugins[type] = this._plugins[type] || [];
+  plugins.push(plugin);
+}
+
+BitJoe.prototype.unregister = function(type, plugin) {
+  if (arguments.length === 0) {
+    // remove all
+    this._plugins = {};
+    return;
+  }
+
+  var plugins = this._plugins[type];
+  if (plugins) {
+    if (!plugin) {
+      // remove all plugins for type
+      delete this._plugins[type];
+      return;
+    }
+
+    var idx = plugins.indexOf(plugin);
+    if (idx !== -1) {
+      plugins.splice(idx, 1);
+      return;
+    }
+  }
+
+  return false;
+}
+
+BitJoe.prototype.getPluginsFor = function(type) {
+  var catchAllPlugins = this._plugins['*'] || [];
+  var plugins = this._plugins[type] || [];
+  return plugins.concat(catchAllPlugins);
+}
+
+BitJoe.prototype.processFile = function(obj, incoming) {
+  if (!obj._type) return Q.resolve(obj);
+
+  var plugins = this.getPluginsFor(obj._type);
+  var processMethod = incoming ? 'processIncoming' : 'processOutgoing';
+  // hand off to plugins in series
+  return plugins.reduce(function(prev, next) {
+      // wrap in promise so we don't have to repeat ourselves below
+      // Q.resolve(prev) === prev if prev is a promise
+      prev = Q.resolve(prev);
+      return prev.then(function(processed) {
+        return next[processMethod](processed || obj);
+      });
+    }, Q.resolve(obj))
+    .then(function(processed) {
+      return processed || obj;
+    });
+}
+
+BitJoe.prototype.processIncomingFile = function(obj) {
+  return this.processFile(obj, true);
+}
+
+BitJoe.prototype.processOutgoingFile = function(obj) {
+  return this.processFile(obj);
+}
+
 /**
  *  Proxy function to create a new TransactionRequest
  */
@@ -183,6 +255,7 @@ BitJoe.prototype.share = function() {
 
 BitJoe.prototype.requestConfig = function() {
   return {
+    joe: this,
     wallet: this.wallet(),
     networkName: this.networkName(),
     keeper: this.keeper(),
@@ -260,11 +333,6 @@ BitJoe.prototype._onTransaction = function(tx) {
   this._loader.load(tx);
 }
 
-BitJoe.prototype.processFile = function(file) {
-  debug('Received file:', file);
-  // this.emit('file', file);
-}
-
 BitJoe.prototype.keeper = function() {
   return this._keeper;
 }
@@ -278,15 +346,45 @@ BitJoe.prototype.getDataTransactions = function() {
     .filter(common.getOpReturnData);
 }
 
-BitJoe.prototype.withdrawFromFaucet = function(value, callback) {
-  callback = dezalgo(callback || noop);
+BitJoe.prototype.getFunded = function(amount) {
+  amount = amount || MIN_BALANCE;
+  var defer = Q.defer();
+  var interval;
 
-  if (!this.isTestnet()) return callback(new Error('can only withdraw from faucet on testnet'));
+  this.once('balance', defer.resolve);
+  this.charge(10, MIN_BALANCE)
+    .then(function() {
+      debug('Funding is on its way...');
+      interval = setInterval(function() {
+        debug('Waiting for funds to arrive...');
+      }, 10000);
+    })
+    .catch(defer.reject);
 
-  var cbAddresses = commonBlockchains('testnet').addresses;
-  console.log('Withdrawing from testnet faucet');
+  return defer.promise.finally(function() {
+    clearInterval(interval);
+  });
+}
 
-  return Q.ninvoke(cbAddresses, '__faucetWithdraw', this.currentReceiveAddress(), value || 1e7);
+BitJoe.prototype.withdrawFromFaucet = function(amount) {
+  return this.charge(1, amount);
+}
+
+/**
+ * @param n - number of addresses to charge
+ * @param perAddr - amount to charge each address
+ */
+BitJoe.prototype.charge = function(n, perAddr) {
+  if (!this.isTestnet()) return Q.reject(new Error('can only withdraw from faucet on testnet'));
+
+  var wallet = this._wallet;
+  var c = new Charger(wallet);
+
+  for (var i = 0; i < n; i++) {
+    c.charge(wallet.getNextAddress(i + 1), perAddr);
+  }
+
+  return Q.ninvoke(c, 'execute');
 }
 
 BitJoe.prototype.getBalance = function(minConf) {
@@ -331,15 +429,24 @@ BitJoe.prototype.scheduleSync = function(interval) {
 
 BitJoe.prototype.sync = function() {
   var self = this;
+  var minConf = this.config('minConf') || 0;
+  var oldBalance = this.getBalance(minConf);
   return Q.ninvoke(this._wallet, 'sync')
     .then(function(numUpdates) {
-      if (numUpdates) self.emit('sync');
+      if (!numUpdates) return;
+
+      self.emit('sync');
+      var balance = self.getBalance(minConf);
+      if (balance !== oldBalance) {
+        self.emit('balance', balance);
+      }
     });
 }
 
 BitJoe.prototype.exitIfErr = function(err) {
   if (err) {
     console.log('Error', err);
+    console.log(err.stack);
     this.destroy().done(function() {
       process.exit();
     });
