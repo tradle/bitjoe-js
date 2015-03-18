@@ -7,7 +7,7 @@
   "prefix": "tradle",
   "maxDataBytes": 40,
   "networkName": "testnet",
-  "autofund": true,
+  "autofund": 100000,
   "minConf": 0,
 
   "webHookMaxTimeouts": 3,
