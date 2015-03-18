@@ -58,7 +58,7 @@
     "re-emitter": "https://registry.npmjs.org/re-emitter/-/re-emitter-1.0.0.tgz",
     "secure-random": "^1.1.1",
     "simple-jobs": "^0.0.1",
-    "testnet-charger": "^0.0.4",
+    "testnet-charger": "^0.0.5",
     "tradle-utils": "^0.1.0",
     "tx-walker": "0.0.1",
     "typeforce": "^0.1.0",
