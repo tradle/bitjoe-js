@@ -11,9 +11,9 @@ var BIP39 = require('bip39');
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
 var fs = require('fs');
-var extend = require('extend');
 var requests = require('./lib/requests');
-var defaults = require('extend');
+var extend = require('extend');
+var defaults = require('defaults');
 var commonBlockchains = require('./lib/commonBlockchains');
 var KeeperAPI = require('bitkeeper-client-js');
 var hooks = require('./lib/hooks');
@@ -26,6 +26,7 @@ var reemit = require('re-emitter');
 var requireOption = utils.requireOption;
 var requireParam = utils.requireParam;
 var Charger = require('testnet-charger');
+var STABLE_AFTER = 10; // confirmations
 
 var faucets = {
   TP: 'msj42CCGruhRsFrGATiUuh25dtxYtnpbTx',
@@ -53,8 +54,7 @@ function BitJoe(config) {
   this._loadWallet()
     .then(function() {
       self._walletReady = true;
-      self._wallet.on('transaction:new', self._onTransaction);
-      self._wallet.on('transaction:update', self._onTransaction);
+      self._wallet.on('tx', self._onTransaction);
       self._checkReady();
     })
     .catch(this.exitIfErr);
@@ -265,7 +265,7 @@ BitJoe.prototype.requestConfig = function() {
 }
 
 BitJoe.prototype.wallet = function() {
-  return this.wallet();
+  return this._wallet;
 }
 
 BitJoe.prototype.config = function(configOption) {
@@ -313,10 +313,14 @@ BitJoe.prototype.autosave = function(path) {
 
   this.on('newwallet', save);
   this.on('ready', function() {
-    self._wallet.on('sync', save);
+    // self._wallet.on('sync', save);
     self._wallet.on('usedaddress', save);
-    self._wallet.on('transaction:new', save);
-    self._wallet.on('transaction:update', save);
+    self._wallet.on('tx', function(tx) {
+      if (!self._isStable(tx)) {
+        save();
+      }
+    });
+
     // self.on('permission:downloaded', self.loadFile);
   });
 
@@ -325,12 +329,19 @@ BitJoe.prototype.autosave = function(path) {
   }
 }
 
+BitJoe.prototype._isStable = function(tx) {
+  var md = this._wallet.getMetadata(tx);
+  return md && typeof md.confirmations === 'number' && md.confirmations > STABLE_AFTER;
+}
+
 BitJoe.prototype._onTransaction = function(tx) {
   debug('Received transaction', tx.getId(), JSON.stringify(this.getMetadata(tx.getId())));
   debug('Balance (confirmed): ' + this.getBalance(6));
   debug('Balance (unconfirmed): ' + this.getBalance(0));
 
-  this._loader.load(tx);
+  if (!this._isStable(tx)) {
+    this._loader.load(tx);
+  }
 }
 
 BitJoe.prototype.keeper = function() {
