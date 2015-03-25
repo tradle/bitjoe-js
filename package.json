@@ -43,7 +43,7 @@
     "bs58": "^2.0.0",
     "buffer-equal": "0.0.1",
     "cb-blockr": "^3.0.2",
-    "cb-helloblock": "^0.4.7",
+    "cb-helloblock": "^0.4.13",
     "cb-wallet": "git://github.com/tradle/cb-wallet.git",
     "concat-stream": "^1.4.7",
     "create-torrent": "^3.5.0",

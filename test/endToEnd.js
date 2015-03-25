@@ -11,6 +11,7 @@ var bufferEqual = require('buffer-equal');
 var extend = require('extend');
 var joes = [];
 var numJoes = 2;
+var MIN_CHARGE = 1e4;
 
 taptest('setup bitjoe', function(t) {
   var tasks;
@@ -157,15 +158,21 @@ taptest('share an existing file with someone new', function(t) {
       shareResp = resp;
     });
 
-  recipient.once('file:permission', function(file, fileKey) {
-    var permission = shareResp.permissions[recipientPubKey];
-    t.ok(permission);
-    t.equal(fileKey, permission.key);
+  recipient.on('file:permission', function onPermission(file, fileKey, tx) {
+    if (tx.getId() === shareResp.tx.getId()) {
+      recipient.removeListener('file:permission', onPermission);
+      var permission = shareResp.permission;
+      t.ok(permission);
+      t.equal(fileKey, permission.key().toString('hex'));
+    }
   });
 
-  recipient.once('file:shared', function(file, fileKey) {
-    t.equal(fileKey, createResp.fileKey);
-    endIn(t, 10000); // throttle
+  recipient.on('file:shared', function onSharedFile(file, fileKey, tx) {
+    if (tx.getId() === shareResp.tx.getId()) {
+      recipient.removeListener('file:shared', onSharedFile);
+      t.equal(fileKey, createResp.fileKey);
+      endIn(t, 10000); // throttle
+    }
   });
 
   sender.on('error', t.error);
@@ -184,24 +191,28 @@ taptest('cleanup', function(t) {
 });
 
 function promiseFund(joe, amount) {
-  return Q.Promise(function(resolve, reject) {
-    amount = amount || 1e5;
+  var promise = Q.Promise(function(resolve, reject) {
+    amount = amount || MIN_CHARGE;
     joe.on('ready', function() {
-      recharge(joe, 1e5);
+      recharge(joe, MIN_CHARGE)
+        .done(checkBalance);
+
+      joe.wallet().on('tx', checkBalance);
     });
 
-    joe.on('sync', checkBalance);
-
     function checkBalance() {
+      if (promise.inspect().state !== 'pending') return;
+
       var balance = joe.getBalance(0);
       if (balance < amount) return;
 
-      console.log('Funded from faucet: ' + balance);
       joe.removeListener('sync', checkBalance);
-      joe.removeListener('ready', checkBalance);
+      joe.removeListener('tx', checkBalance);
       resolve();
     }
   });
+
+  return promise;
 }
 
 function promiseReady(joe) {
@@ -219,6 +230,6 @@ function endIn(t, timeout) {
 }
 
 function recharge(joe, satoshis) {
-  return joe.charge(1, satoshis || 1e5)
+  return joe.charge(1, satoshis || MIN_CHARGE)
     .then(joe.sync);
 }
