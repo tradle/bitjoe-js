@@ -16,7 +16,6 @@ var extend = require('extend');
 var defaults = require('defaults');
 var commonBlockchains = require('./lib/commonBlockchains');
 var KeeperAPI = require('bitkeeper-client-js');
-var hooks = require('./lib/hooks');
 var debug = require('debug')('bitjoe');
 var Jobs = require('simple-jobs');
 var path = require('path');
@@ -48,7 +47,6 @@ function BitJoe(config) {
   this._keeper = keeper.isKeeper ? keeper : new KeeperAPI(keeper);
 
   this._jobs = new Jobs();
-  this._hooks = hooks(this);
 
   // this._promptPassword(function() {
   this._loadWallet()
@@ -547,14 +545,6 @@ BitJoe.prototype.wallet = function() {
 
 BitJoe.prototype.currentReceiveAddress = function() {
   return this._wallet.getReceiveAddress();
-}
-
-BitJoe.prototype.addHooks = function(url /* [event1, event2, ...] */ ) {
-  return this._hooks.addHooks.apply(this._hooks, arguments);
-}
-
-BitJoe.prototype.removeHooks = function(url /* [event1, event2, ...] */ ) {
-  return this._hooks.removeHooks.apply(this._hooks, arguments);
 }
 
 function loadOrCreateWallet(options) {
