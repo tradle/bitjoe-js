@@ -137,7 +137,10 @@ BitJoe.prototype._initWallet = function(wallet) {
   return this.sync()
     .then(function() {
       if (autofund && self.isTestnet() && self.getBalance(0) < MIN_BALANCE) {
-        return self.getFunded(typeof autofund === 'number' ? autofund : MIN_BALANCE);
+        var amount = typeof autofund === 'number' ? autofund : MIN_BALANCE;
+        var n = 5;
+        var perAddr = Math.ceil(amount / n);
+        return self.charge(n, perAddr);
       }
     });
 }
@@ -355,26 +358,6 @@ BitJoe.prototype.getDataTransactions = function() {
     .filter(common.getOpReturnData);
 }
 
-BitJoe.prototype.getFunded = function(amount) {
-  amount = amount || MIN_BALANCE;
-  var defer = Q.defer();
-  var interval;
-
-  this.once('balance', defer.resolve);
-  this.charge(10, MIN_BALANCE)
-    .then(function() {
-      debug('Funding is on its way...');
-      interval = setInterval(function() {
-        debug('Waiting for funds to arrive...');
-      }, 10000);
-    })
-    .catch(defer.reject);
-
-  return defer.promise.finally(function() {
-    clearInterval(interval);
-  });
-}
-
 BitJoe.prototype.withdrawFromFaucet = function(amount) {
   return this.charge(1, amount);
 }
@@ -451,18 +434,11 @@ BitJoe.prototype.sync = function() {
   }
 
   debug('Starting sync');
-
-  var minConf = this.config('minConf') || 0;
-  var oldBalance = this.getBalance(minConf);
   this._syncPromise = Q.ninvoke(this._wallet, 'sync')
     .then(function(numUpdates) {
       if (!numUpdates) return;
 
       self.emit('sync');
-      var balance = self.getBalance(minConf);
-      if (balance !== oldBalance) {
-        self.emit('balance', balance);
-      }
     })
     .finally(function() {
       delete self._syncPromise;
