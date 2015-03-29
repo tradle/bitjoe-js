@@ -7,6 +7,8 @@ var MIN_BALANCE = 1e5;
 var bitcoin = require('bitcoinjs-lib');
 var cryptoUtils = require('./lib/crypto');
 var CBWallet = require('cb-wallet');
+// override CBWallet.API
+CBWallet.API = require('cb-blockr');
 var BIP39 = require('bip39');
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
@@ -56,6 +58,7 @@ function BitJoe(config) {
   // });
 
   this.on('ready', this._onready);
+  this._syncPromise = null;
 }
 
 inherits(BitJoe, EventEmitter);
@@ -106,16 +109,12 @@ BitJoe.prototype._loadWallet = function() {
   this._setupStorage();
 
   this._blockchain = commonBlockchains(this.networkName());
-  if (this._wallet) {
-    // return process.nextTick(function() {
-    //   self.emit('ready');
-    // });
-    return Q.resolve();
-  }
+  if (this._wallet) return Q.resolve();
 
   var options = extend({
     networkName: this.networkName()
   }, this.config('wallet'));
+
   return loadOrCreateWallet(options)
     .then(this._initWallet);
 }
@@ -281,14 +280,14 @@ BitJoe.prototype.isTestnet = function() {
 }
 
 BitJoe.prototype._setupStorage = function() {
-  if (this._ready) return;
+  if (this.ready()) return;
 
   var storageConfig = this.config('wallet');
   if (storageConfig.autosave)
     this.autosave(storageConfig.path);
 
-  // this._saveQueue = queue(1); // prevent concurrent saves
-  this._savesQueued = [];
+  this._queuedSave = null;
+  this._savePromise = Q.resolve();
 }
 
 BitJoe.prototype.autosave = function(path) {
@@ -432,19 +431,30 @@ BitJoe.prototype.toJSON = function() {
 }
 
 BitJoe.prototype.scheduleSync = function(interval) {
-  if ('_syncTimeout' in this) return;
+  if (this._destroyed) return;
 
   interval = interval || this.config('syncInterval') || 60000;
+
+  clearTimeout(this._syncTimeout);
+  delete this._syncTimeout;
   this._syncTimeout = setTimeout(this.sync, interval);
 }
 
 BitJoe.prototype.sync = function() {
-  delete this._syncTimeout;
-
   var self = this;
+
+  if (this._destroyed) return Q.reject();
+
+  if (this._syncPromise) {
+    var state = this._syncPromise.inspect().state;
+    if (state === 'pending') return this._syncPromise;
+  }
+
+  debug('Starting sync');
+
   var minConf = this.config('minConf') || 0;
   var oldBalance = this.getBalance(minConf);
-  return Q.ninvoke(this._wallet, 'sync')
+  this._syncPromise = Q.ninvoke(this._wallet, 'sync')
     .then(function(numUpdates) {
       if (!numUpdates) return;
 
@@ -455,8 +465,12 @@ BitJoe.prototype.sync = function() {
       }
     })
     .finally(function() {
+      delete self._syncPromise;
+      debug('Scheduling next sync');
       self.scheduleSync();
     });
+
+  return this._syncPromise;
 }
 
 BitJoe.prototype.exitIfErr = function(err) {
@@ -469,72 +483,81 @@ BitJoe.prototype.exitIfErr = function(err) {
   }
 }
 
-BitJoe.prototype.destroy = function() {
-  this._savesQueued.length = 0;
+BitJoe.prototype._onSavesFinished = function() {
+  if (!this._saving) return Q.resolve();
 
+  var defer = Q.defer();
+  this.once('save', defer.resolve);
+  this.once('save:error', defer.resolve);
+
+  return defer.promise
+    .then(this._onSavesFinished);
+}
+
+BitJoe.prototype.destroy = function() {
   var tasks = [
-    // TODO add current save task
+    this._onSavesFinished()
   ];
 
-  return Q.all(tasks);
+  delete this._syncTimeout;
+  this._destroyed = true;
+
+  return Q.allSettled(tasks);
 }
 
-BitJoe.prototype.queueSave = function(options, callback) {
+BitJoe.prototype.queueSave = function(options) {
+  if (this._destroyed) return;
+
   requireParam('options', options);
 
-  if (this._savesQueued.length) return;
-  if (this._saving) {
-    this._savesQueued.push(arguments);
-    debug('Queued save');
-    return;
-  }
+  if (this._queuedSave) return;
+  if (!this._saving) this._save(options);
 
-  this._save(options);
+  this._queuedSave = arguments;
+  debug('Queued save');
 }
 
-BitJoe.prototype._save = function(options, callback) {
+BitJoe.prototype._save = function(options) {
   var self = this;
+
+  this._saving = true;
 
   requireParam('options', options);
   var walletPath = requireOption(options, 'path');
   walletPath = path.resolve(walletPath);
 
-  this._saving = true;
   console.log('Saving wallet');
 
-  if (options.overwrite === false) {
-    fs.exists(walletPath, function(exists) {
-      if (exists) return callback(new Error('Wallet file exists, to overwrite specify option: overwrite'));
+  var walletStr = this.toJSON();
+  if (options.password) {
+    walletStr = cryptoUtils.encrypt(walletStr, options.password);
+  }
 
-      options = defaults({
-        overwrite: true
-      }, options);
-      self.queueSave(options);
-      done();
-    })
-  } else {
-    var walletStr = this.toJSON();
-    if (options.password)
-      walletStr = cryptoUtils.encrypt(walletStr, options.password);
-
-    utils.writeFile({
-      // safe: false,
+  return Q.ninvoke(utils, 'writeFile', {
+      safe: true,
       path: walletPath,
       data: walletStr,
       options: getFileOptions(options)
-    }, done);
-  }
-
-  function done(err) {
-    console.log('Saved wallet');
-    self._saving = false;
-
-    if (callback)
-      callback(err);
-
-    if (self._savesQueued.length)
-      self._save.apply(self, self._savesQueued.pop());
-  }
+    })
+    .finally(function() {
+      // set this flag before emitting result events
+      self._saving = false;
+    })
+    .then(function() {
+      console.log('Saved wallet');
+      self.emit('save');
+    })
+    .catch(function(err) {
+      console.log('Failed to save wallet', err);
+      self.emit('save:error', err);
+    })
+    .finally(function() {
+      var queued = self._queuedSave;
+      if (queued) {
+        self._queuedSave = null;
+        self._save.apply(self, queued);
+      }
+    });
 }
 
 BitJoe.prototype.networkName = function() {

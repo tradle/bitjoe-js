@@ -1,9 +1,25 @@
 var taptest = require('tape');
+var fs = require('fs');
+var path = require('path');
 var app = require('./fixtures/app');
 var fakeKeeper = require('./helpers/fakeKeeper');
 var DataLoader = require('../lib/dataLoader');
 var Scanner = require('../lib/scanner');
 var common = require('../lib/common');
+var Joe = require('../');
+var sharedKeeper = fakeKeeper.forMap({});
+var config = {
+  wallet: {
+    autosave: true,
+    path: './test/test.wallet'
+  },
+  autofund: false,
+  keeper: sharedKeeper,
+  prefix: 'test',
+  networkName: 'testnet',
+  syncInterval: 10000,
+  minConf: 0
+};
 
 taptest('current block height', function(t) {
   t.plan(1);
@@ -12,6 +28,31 @@ taptest('current block height', function(t) {
     .done(function(height) {
       t.ok(typeof height === 'number');
     });
+});
+
+taptest('destroy waits for save and queue save to finish', function(t) {
+  t.plan(2);
+
+  var joe = new Joe(config);
+  joe.on('ready', function() {
+    joe.queueSave(config.wallet); // immediate
+    joe.queueSave(config.wallet); // queued
+    joe.queueSave(config.wallet); // (should be) ignored
+    joe.destroy();
+    joe.on('save', t.pass);
+    joe.on('save:error', t.error);
+  });
+});
+
+taptest('1 sync at a time', function(t) {
+  t.plan(2);
+
+  var joe = new Joe(config);
+  joe.on('ready', function() {
+    var promise = joe.sync();
+    t.ok(promise === joe.sync());
+    joe.destroy().done(t.pass);
+  });
 });
 
 taptest('scan blockchain for public data', function(t) {
@@ -66,3 +107,7 @@ taptest('load app models from list of model-creation tx ids', function(t) {
       t.deepEqual(_models, models);
     })
 });
+
+taptest('cleanup', function(t) {
+  fs.unlink(path.resolve(config.wallet.path), t.end);
+})
