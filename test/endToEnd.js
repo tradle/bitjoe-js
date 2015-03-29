@@ -100,7 +100,8 @@ taptest('create a shared encrypted file, load it', function(t) {
     });
 
   recipients.forEach(function(joe) {
-    joe.once('file:permission', function(file, fileKey) {
+    joe.once('file:permission', function(info) {
+      var fileKey = info.file.key;
       recipientPubKeys.forEach(function(pubKey) {
         var permission = createResp.permissions[pubKey.toHex()];
         t.ok(permission);
@@ -108,7 +109,8 @@ taptest('create a shared encrypted file, load it', function(t) {
       });
     });
 
-    joe.once('file:shared', function(file, fileKey) {
+    joe.once('file:shared', function(info) {
+      var fileKey = info.file.key;
       t.equal(fileKey, createResp.fileKey);
 
       if (--numToGo > 0) return;
@@ -158,7 +160,9 @@ taptest('share an existing file with someone new', function(t) {
       shareResp = resp;
     });
 
-  recipient.on('file:permission', function onPermission(file, fileKey, tx) {
+  recipient.on('file:permission', function onPermission(info) {
+    var tx = info.tx.body;
+    var fileKey = info.file.key;
     if (tx.getId() === shareResp.tx.getId()) {
       recipient.removeListener('file:permission', onPermission);
       var permission = shareResp.permission;
@@ -167,7 +171,9 @@ taptest('share an existing file with someone new', function(t) {
     }
   });
 
-  recipient.on('file:shared', function onSharedFile(file, fileKey, tx) {
+  recipient.on('file:shared', function onSharedFile(info) {
+    var tx = info.tx.body;
+    var fileKey = info.file.key;
     if (tx.getId() === shareResp.tx.getId()) {
       recipient.removeListener('file:shared', onSharedFile);
       t.equal(fileKey, createResp.fileKey);

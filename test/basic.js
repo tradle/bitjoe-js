@@ -39,7 +39,9 @@ taptest('scan blockchain for public data', function(t) {
     .scan(function(err) {
       t.error(err);
     })
-    .on('file:public', function(file, fileKey) {
+    .on('file:public', function(info) {
+      var file = info.file.body;
+      var fileKey = info.file.key;
       t.deepEqual(file, map[fileKey]);
       if (--numFiles === 0) {
         scanner.stop();
