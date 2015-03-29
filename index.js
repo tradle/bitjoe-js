@@ -17,7 +17,6 @@ var defaults = require('defaults');
 var commonBlockchains = require('./lib/commonBlockchains');
 var KeeperAPI = require('bitkeeper-client-js');
 var debug = require('debug')('bitjoe');
-var Jobs = require('simple-jobs');
 var path = require('path');
 var utils = require('tradle-utils');
 var DataLoader = require('./lib/dataLoader');
@@ -45,8 +44,6 @@ function BitJoe(config) {
   this._config = config || {};
   var keeper = this.config('keeper');
   this._keeper = keeper.isKeeper ? keeper : new KeeperAPI(keeper);
-
-  this._jobs = new Jobs();
 
   // this._promptPassword(function() {
   this._loadWallet()
@@ -134,7 +131,7 @@ BitJoe.prototype._initWallet = function(wallet) {
 
   this.scheduleSync();
   if (wallet._isNew) {
-    this.emit('newwallet', wallet);
+    this.emit('newwallet');
     if (!autofund) return Q.resolve();
   }
 
@@ -333,9 +330,13 @@ BitJoe.prototype._isStable = function(tx) {
 }
 
 BitJoe.prototype._onTransaction = function(tx) {
-  debug('Received transaction', tx.getId(), JSON.stringify(this.getMetadata(tx.getId())));
+  var metadata = this.getMetadata(tx);
+  debug('Received transaction', tx.getId(), common.prettify(metadata));
   debug('Balance (confirmed): ' + this.getBalance(6));
   debug('Balance (unconfirmed): ' + this.getBalance(0));
+
+  var event = 'tx:' + (metadata.confirmations ? 'confirmation' : 'unconfirmed');
+  this.emit(event, tx, metadata);
 
   if (!this._isStable(tx)) {
     this._loader.load(tx);
@@ -431,12 +432,15 @@ BitJoe.prototype.toJSON = function() {
 }
 
 BitJoe.prototype.scheduleSync = function(interval) {
-  this._syncInterval = interval || this.config('syncInterval') || 60000;
-  if (!this._jobs.has('sync'))
-    this._jobs.add('sync', this.sync, this._syncInterval);
+  if ('_syncTimeout' in this) return;
+
+  interval = interval || this.config('syncInterval') || 60000;
+  this._syncTimeout = setTimeout(this.sync, interval);
 }
 
 BitJoe.prototype.sync = function() {
+  delete this._syncTimeout;
+
   var self = this;
   var minConf = this.config('minConf') || 0;
   var oldBalance = this.getBalance(minConf);
@@ -449,6 +453,9 @@ BitJoe.prototype.sync = function() {
       if (balance !== oldBalance) {
         self.emit('balance', balance);
       }
+    })
+    .finally(function() {
+      self.scheduleSync();
     });
 }
 
@@ -456,14 +463,13 @@ BitJoe.prototype.exitIfErr = function(err) {
   if (err) {
     console.log('Error', err);
     console.log(err.stack);
-    this.destroy().done(function() {
+    this.destroy().always(function() {
       process.exit();
     });
   }
 }
 
 BitJoe.prototype.destroy = function() {
-  this._jobs.clear();
   this._savesQueued.length = 0;
 
   var tasks = [
