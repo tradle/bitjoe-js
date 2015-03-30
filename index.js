@@ -140,7 +140,7 @@ BitJoe.prototype._initWallet = function(wallet) {
         var amount = typeof autofund === 'number' ? autofund : MIN_BALANCE;
         var n = 5;
         var perAddr = Math.ceil(amount / n);
-        return self.charge(n, perAddr);
+        self.charge(n, perAddr);
       }
     });
 }
@@ -510,7 +510,7 @@ BitJoe.prototype._save = function(options) {
   }
 
   return Q.ninvoke(utils, 'writeFile', {
-      safe: true,
+      // safe: false,
       path: walletPath,
       data: walletStr,
       options: getFileOptions(options)
