@@ -89,11 +89,11 @@ BitJoe.prototype._onready = function() {
   // test mode
   console.log('Balance: ' + this.getBalance());
   console.log('Fund me at ' + this.currentReceiveAddress());
-  var addresses = this.wallet().getAddresses();
+  var addresses = this._wallet.getAddresses();
   if (addresses.length < 5) {
     addresses = [];
     for (var i = 0; i < 5; i++) {
-      addresses.push(this.wallet().getNextAddress(i));
+      addresses.push(this._wallet.getNextAddress(i));
     }
   }
 
@@ -125,8 +125,6 @@ BitJoe.prototype._initWallet = function(wallet) {
   var self = this;
   var autofund = this.config('autofund');
   this._wallet = wallet;
-
-  utils.proxyFunctions(this, this._wallet);
 
   this.scheduleSync();
   if (wallet._isNew) {
@@ -253,7 +251,7 @@ BitJoe.prototype.share = function() {
 BitJoe.prototype.requestConfig = function() {
   return {
     joe: this,
-    wallet: this.wallet(),
+    wallet: this._wallet,
     networkName: this.networkName(),
     keeper: this.keeper(),
     prefix: this.config('prefix'),
@@ -327,7 +325,7 @@ BitJoe.prototype.autosave = function(path) {
 }
 
 BitJoe.prototype._isStable = function(tx) {
-  var md = this._wallet.getMetadata(tx);
+  var md = this.getMetadata(tx);
   return md && typeof md.confirmations === 'number' && md.confirmations > STABLE_AFTER;
 }
 
@@ -381,6 +379,27 @@ BitJoe.prototype.charge = function(n, perAddr) {
 
 BitJoe.prototype.getBalance = function(minConf) {
   return this._wallet.getBalance(typeof minConf === 'undefined' ? this.config('minConf') : minConf);
+}
+
+BitJoe.prototype.getTx = function(txId) {
+  return this._wallet.getTx(txId);
+}
+
+BitJoe.prototype.getNextAddress = function(type, offset) {
+  return this._wallet.getNextAddress(type, offset);
+}
+
+BitJoe.prototype.getPublicKeyForAddress = function(addr) {
+  return this._wallet.getPublicKeyForAddress(addr);
+}
+
+/**
+ * get metadata (confirmations, value, fee, etc.) for a transaction in the wallet
+ * @param {String} txId
+ */
+BitJoe.prototype.getMetadata =
+BitJoe.prototype.getTxMetadata = function(txId) {
+  return this._wallet.getMetadata(txId);
 }
 
 /**
@@ -453,7 +472,7 @@ BitJoe.prototype.exitIfErr = function(err) {
   if (err) {
     console.log('Error', err);
     console.log(err.stack);
-    this.destroy().always(function() {
+    this.destroy().finally(function() {
       process.exit();
     });
   }
