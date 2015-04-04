@@ -1,11 +1,14 @@
 var taptest = require('tape');
+var Q = require('q');
 var fs = require('fs');
 var path = require('path');
+var pluck = require('array-pluck');
 var app = require('./fixtures/app');
 var fakeKeeper = require('./helpers/fakeKeeper');
 var DataLoader = require('../lib/dataLoader');
-var Scanner = require('../lib/scanner');
 var common = require('../lib/common');
+var Blockchain = require('../lib/commonBlockchains');
+var bitcoin = require('bitcoinjs-lib');
 var Joe = require('../');
 var sharedKeeper = fakeKeeper.forMap({});
 var config = {
@@ -55,57 +58,41 @@ taptest('1 sync at a time', function(t) {
   });
 });
 
-taptest('scan blockchain for public data', function(t) {
-  var models = app.models.bodies;
-  var map = {};
-  [
-    '8e2b8d39cf77de22a028e26769003b29a43348ac',
-    'f89ad154207d45ef031601fe50b270ca27a811f3'
-  ].forEach(function(key, i) {
-    map[key] = models[i];
-  })
-
-  // same file stored 4 times
-
-  var numFiles = Object.keys(map).length;
-  t.plan(numFiles);
-
-  var scanner = new Scanner({
-      keeper: fakeKeeper.forMap(map),
-      networkName: 'testnet',
-      prefix: 'tradle'
-    })
-    .from(321997)
-    .to(322003)
-    .scan(function(err) {
-      t.error(err);
-    })
-    .on('file:public', function(info) {
-      var file = info.file.body;
-      var fileKey = info.file.key;
-      t.deepEqual(file, map[fileKey]);
-      if (--numFiles === 0) {
-        scanner.stop();
-      }
-    })
-});
-
 taptest('load app models from list of model-creation tx ids', function(t) {
   t.plan(1);
 
+  var network = 'testnet';
+  var api = new Blockchain(network);
   var models = app.models.bodies;
-  fakeKeeper.forData(models)
-    .then(function(keeper) {
+  var txIds = app.models.txIds;
+  var loaded = [];
+  Q.all([
+      Q.ninvoke(api.transactions, 'get', txIds),
+      fakeKeeper.forData(models)
+    ])
+    .spread(function(txs, keeper) {
+      txs = txs.map(function(tx) {
+        return bitcoin.Transaction.fromHex(tx.txHex);
+      });
+
       var loader = new DataLoader({
-        networkName: 'testnet',
+        prefix: 'tradle',
+        networkName: network,
         keeper: keeper
       });
 
-      return loader.load(app.models.txIds);
+      ['file:public', 'file:shared'].forEach(function(event) {
+        loader.on(event, function(file) {
+          loaded.push(file);
+        });
+      });
+
+      return loader.load(txs);
     })
-    .then(function(_models) {
-      t.deepEqual(_models, models);
+    .then(function() {
+      t.deepEqual(pluck(loaded, 'file'), models);
     })
+    .done();
 });
 
 taptest('cleanup', function(t) {

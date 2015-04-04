@@ -15,7 +15,6 @@ var inherits = require('util').inherits;
 var fs = require('fs');
 var requests = require('./lib/requests');
 var extend = require('extend');
-var defaults = require('defaults');
 var commonBlockchains = require('./lib/commonBlockchains');
 var KeeperAPI = require('bitkeeper-client-js');
 var debug = require('debug')('bitjoe');
@@ -43,7 +42,7 @@ function BitJoe(config) {
   utils.bindPrototypeFunctions(this);
 
   this._plugins = Object.create(null);
-  this._config = config || {};
+  this._config = extend({}, config || {});
   var keeper = this.config('keeper');
   this._keeper = keeper.isKeeper ? keeper : new KeeperAPI(keeper);
 
@@ -249,14 +248,11 @@ BitJoe.prototype.share = function() {
 }
 
 BitJoe.prototype.requestConfig = function() {
-  return {
-    joe: this,
-    wallet: this._wallet,
-    networkName: this.networkName(),
-    keeper: this.keeper(),
-    prefix: this.config('prefix'),
-    minConf: this.config('minConf')
-  }
+  var conf = common.pick(this._config, 'prefix', 'minConf', 'addressBook', 'networkName');
+  conf.joe = this;
+  conf.keeper = this.keeper();
+  conf.wallet = this.wallet();
+  return conf;
 }
 
 BitJoe.prototype.wallet = function() {
@@ -264,9 +260,7 @@ BitJoe.prototype.wallet = function() {
 }
 
 BitJoe.prototype.config = function(configOption) {
-  return typeof configOption === 'undefined' ?
-    this._config :
-    this._config[configOption];
+  return typeof configOption === 'undefined' ? this._config : this._config[configOption];
 }
 
 BitJoe.prototype.setConfig = function(option, value) {
@@ -284,8 +278,7 @@ BitJoe.prototype._setupStorage = function() {
   if (this.ready()) return;
 
   var storageConfig = this.config('wallet');
-  if (storageConfig.autosave)
-    this.autosave(storageConfig.path);
+  if (storageConfig.autosave) this.autosave(storageConfig.path);
 
   this._queuedSave = null;
   this._savePromise = Q.resolve();
@@ -296,15 +289,11 @@ BitJoe.prototype.autosave = function(path) {
 
   var self = this;
 
-  if (!this._autosavePaths)
-    this._autosavePaths = [];
-  else if (this._autosavePaths.indexOf(path) !== -1)
-    return;
+  if (!this._autosavePaths) this._autosavePaths = [];
+  else if (this._autosavePaths.indexOf(path) !== -1) return;
 
   this._autosavePaths.push(path);
-  var options = defaults({
-    path: path
-  }, this.config('wallet'));
+  var options = extend({}, this.config('wallet'), { path: path });
 
   this.on('newwallet', save);
   this.on('ready', function() {
@@ -521,7 +510,7 @@ BitJoe.prototype._save = function(options) {
   var walletPath = requireOption(options, 'path');
   walletPath = path.resolve(walletPath);
 
-  console.log('Saving wallet');
+  debug('Saving wallet');
 
   var walletStr = this.toJSON();
   if (options.password) {
@@ -539,11 +528,11 @@ BitJoe.prototype._save = function(options) {
       self._saving = false;
     })
     .then(function() {
-      console.log('Saved wallet');
+      debug('Saved wallet');
       self.emit('save');
     })
     .catch(function(err) {
-      console.log('Failed to save wallet', err);
+      debug('Failed to save wallet', err);
       self.emit('save:error', err);
     })
     .finally(function() {

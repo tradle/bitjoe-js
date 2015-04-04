@@ -114,7 +114,7 @@ taptest('permission file + transaction construction, reconstruction', function(t
   permission.build()
     .then(function() {
 
-      var typeCode = TransactionData.types.ENCRYPTED_SHARE;
+      var typeCode = TransactionData.types.permission;
       var encryptedPermissionKey = permission.encryptedKey();
 
       var tData = new TransactionData(prefix, typeCode, encryptedPermissionKey);

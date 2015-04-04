@@ -18,7 +18,8 @@ taptest('setup bitjoe', function(t) {
   var sharedKeeper = fakeKeeper.forMap({});
   var config = {
     wallet: {
-      autosave: false
+      path: './test/joe.wallet',
+      autosave: true
     },
     keeper: sharedKeeper,
     prefix: 'test',
@@ -85,8 +86,7 @@ taptest('create a shared encrypted file, load it', function(t) {
   console.warn('This make take a minute');
   var recipientPubKeys = recipients.map(function(joe) {
     var addr = joe.getNextAddress();
-    var pubKey = joe.getPublicKeyForAddress(addr);
-    return pubKey;
+    return joe.getPublicKeyForAddress(addr);
   });
 
   var numToGo = recipients.length;
@@ -101,17 +101,15 @@ taptest('create a shared encrypted file, load it', function(t) {
 
   recipients.forEach(function(joe) {
     joe.once('file:permission', function(info) {
-      var fileKey = info.file.key;
       recipientPubKeys.forEach(function(pubKey) {
         var permission = createResp.permissions[pubKey.toHex()];
         t.ok(permission);
-        t.equal(fileKey, permission.key);
+        t.equal(info.key, permission.key);
       });
     });
 
     joe.once('file:shared', function(info) {
-      var fileKey = info.file.key;
-      t.equal(fileKey, createResp.fileKey);
+      t.equal(info.key, createResp.fileKey);
 
       if (--numToGo > 0) return;
 
@@ -161,22 +159,18 @@ taptest('share an existing file with someone new', function(t) {
     });
 
   recipient.on('file:permission', function onPermission(info) {
-    var tx = info.tx.body;
-    var fileKey = info.file.key;
-    if (tx.getId() === shareResp.tx.getId()) {
+    if (info.tx.getId() === shareResp.tx.getId()) {
       recipient.removeListener('file:permission', onPermission);
       var permission = shareResp.permission;
       t.ok(permission);
-      t.equal(fileKey, permission.key().toString('hex'));
+      t.equal(info.key, permission.key().toString('hex'));
     }
   });
 
   recipient.on('file:shared', function onSharedFile(info) {
-    var tx = info.tx.body;
-    var fileKey = info.file.key;
-    if (tx.getId() === shareResp.tx.getId()) {
+    if (info.tx.getId() === shareResp.tx.getId()) {
       recipient.removeListener('file:shared', onSharedFile);
-      t.equal(fileKey, createResp.fileKey);
+      t.equal(info.key, createResp.fileKey);
       endIn(t, 10000); // throttle
     }
   });
@@ -200,6 +194,8 @@ function promiseFund(joe, amount) {
   var promise = Q.Promise(function(resolve, reject) {
     amount = amount || MIN_CHARGE;
     joe.on('ready', function() {
+      if (checkBalance()) return;
+
       recharge(joe, MIN_CHARGE)
         .done(checkBalance);
 
@@ -207,14 +203,13 @@ function promiseFund(joe, amount) {
     });
 
     function checkBalance() {
-      if (promise.inspect().state !== 'pending') return;
-
       var balance = joe.getBalance(0);
       if (balance < amount) return;
 
       joe.removeListener('sync', checkBalance);
       joe.removeListener('tx', checkBalance);
       resolve();
+      return true;
     }
   });
 
