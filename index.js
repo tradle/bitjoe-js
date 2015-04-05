@@ -12,7 +12,6 @@ CBWallet.API = require('cb-blockr');
 var BIP39 = require('bip39');
 var EventEmitter = require('events').EventEmitter;
 var inherits = require('util').inherits;
-var fs = require('fs');
 var requests = require('./lib/requests');
 var extend = require('extend');
 var commonBlockchains = require('./lib/commonBlockchains');
@@ -20,12 +19,16 @@ var KeeperAPI = require('bitkeeper-client-js');
 var debug = require('debug')('bitjoe');
 var path = require('path');
 var utils = require('tradle-utils');
+var levelup = require('level-browserify');
 var DataLoader = require('./lib/dataLoader');
 var reemit = require('re-emitter');
 var requireOption = utils.requireOption;
 var requireParam = utils.requireParam;
 var Charger = require('testnet-charger');
 var STABLE_AFTER = 10; // confirmations
+var levelOptions = {
+  valueEncoding: 'json'
+};
 
 var faucets = {
   TP: 'msj42CCGruhRsFrGATiUuh25dtxYtnpbTx',
@@ -47,6 +50,7 @@ function BitJoe(config) {
   this._keeper = keeper.isKeeper ? keeper : new KeeperAPI(keeper);
 
   // this._promptPassword(function() {
+  this._dbs = {};
   this._loadWallet()
     .then(function() {
       self._walletReady = true;
@@ -114,7 +118,7 @@ BitJoe.prototype._loadWallet = function() {
     networkName: this.networkName()
   }, this.config('wallet'));
 
-  return loadOrCreateWallet(options)
+  return this._loadOrCreateWallet(options)
     .then(this._initWallet);
 }
 
@@ -279,9 +283,6 @@ BitJoe.prototype._setupStorage = function() {
 
   var storageConfig = this.config('wallet');
   if (storageConfig.autosave) this.autosave(storageConfig.path);
-
-  this._queuedSave = null;
-  this._savePromise = Q.resolve();
 }
 
 BitJoe.prototype.autosave = function(path) {
@@ -309,7 +310,7 @@ BitJoe.prototype.autosave = function(path) {
   });
 
   function save() {
-    self.queueSave(options);
+    self.save(options);
   }
 }
 
@@ -418,7 +419,7 @@ BitJoe.prototype.isTestnet = function() {
 }
 
 BitJoe.prototype.toJSON = function() {
-  return this._wallet.serialize();
+  return this._wallet.toJSON();
 }
 
 BitJoe.prototype.scheduleSync = function(interval) {
@@ -467,41 +468,26 @@ BitJoe.prototype.exitIfErr = function(err) {
   }
 }
 
-BitJoe.prototype._onSavesFinished = function() {
-  if (!this._saving) return Q.resolve();
-
-  var defer = Q.defer();
-  this.once('save', defer.resolve);
-  this.once('save:error', defer.resolve);
-
-  return defer.promise
-    .then(this._onSavesFinished);
-}
-
 BitJoe.prototype.destroy = function() {
-  var tasks = [
-    this._onSavesFinished()
-  ];
+  var tasks = [];
+  for (var path in this._dbs) {
+    tasks.push(Q.ninvoke(this._dbs[path], 'close'));
+  }
 
+  clearTimeout(this._syncTimeout);
   delete this._syncTimeout;
   this._destroyed = true;
 
-  return Q.allSettled(tasks);
+  return Q.allSettled(tasks)
+    .then(function() {
+      debug('I was successfully destroyed');
+    })
+    .catch(function(err) {
+      debug('destroy failed', err);
+    });
 }
 
-BitJoe.prototype.queueSave = function(options) {
-  if (this._destroyed) return;
-
-  requireParam('options', options);
-
-  if (this._queuedSave) return;
-  if (!this._saving) this._save(options);
-
-  this._queuedSave = arguments;
-  debug('Queued save');
-}
-
-BitJoe.prototype._save = function(options) {
+BitJoe.prototype.save = function(options) {
   var self = this;
 
   this._saving = true;
@@ -512,21 +498,13 @@ BitJoe.prototype._save = function(options) {
 
   debug('Saving wallet');
 
-  var walletStr = this.toJSON();
+  var walletStr = this._wallet.serialize();
   if (options.password) {
     walletStr = cryptoUtils.encrypt(walletStr, options.password);
   }
 
-  return Q.ninvoke(utils, 'writeFile', {
-      // safe: false,
-      path: walletPath,
-      data: walletStr,
-      options: getFileOptions(options)
-    })
-    .finally(function() {
-      // set this flag before emitting result events
-      self._saving = false;
-    })
+  var db = this._db(walletPath);
+  return Q.ninvoke(db, 'put', walletPath, walletStr)
     .then(function() {
       debug('Saved wallet');
       self.emit('save');
@@ -534,13 +512,6 @@ BitJoe.prototype._save = function(options) {
     .catch(function(err) {
       debug('Failed to save wallet', err);
       self.emit('save:error', err);
-    })
-    .finally(function() {
-      var queued = self._queuedSave;
-      if (queued) {
-        self._queuedSave = null;
-        self._save.apply(self, queued);
-      }
     });
 }
 
@@ -560,7 +531,16 @@ BitJoe.prototype.currentReceiveAddress = function() {
   return this._wallet.getReceiveAddress();
 }
 
-function loadOrCreateWallet(options) {
+BitJoe.prototype._db = function(path) {
+  var db = this._dbs[path];
+  if (!db) {
+    db = this._dbs[path] = levelup(path, levelOptions);
+  }
+
+  return db;
+}
+
+BitJoe.prototype._loadOrCreateWallet = function(options) {
   requireParam(options, 'options');
 
   var walletPath = options.path;
@@ -569,27 +549,20 @@ function loadOrCreateWallet(options) {
   walletPath = path.resolve(walletPath);
   var password = options.password;
 
-  return Q.ninvoke(fs, 'readFile', walletPath, getFileOptions(options))
+  var db = this._db(walletPath);
+  return Q.ninvoke(db, 'get', walletPath)
     .then(function(file) {
       var json = password ? cryptoUtils.decrypt(file, password) : file;
-      return common.walletFromJSON(json);
+      var wallet = common.walletFromJSON(json);
+      console.log('Found existing wallet');
+      return wallet;
     })
     .catch(function(err) {
-      if (err.status === 'ENOENT') throw err;
+      if (err.name !== 'NotFoundError') throw err;
 
       console.log('Existing wallet not found at specified path, creating a new wallet');
       return newWallet(options);
     });
-}
-
-function getFileOptions(options) {
-  return {
-    encoding: getFileEncoding(options.password)
-  };
-}
-
-function getFileEncoding(passwordProtected) {
-  return passwordProtected ? 'base64' : 'utf8';
 }
 
 function newWallet(options) {

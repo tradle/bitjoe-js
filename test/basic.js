@@ -1,6 +1,6 @@
 var taptest = require('tape');
 var Q = require('q');
-var fs = require('fs');
+var rimraf = require('rimraf');
 var path = require('path');
 var pluck = require('array-pluck');
 var app = require('./fixtures/app');
@@ -33,17 +33,30 @@ taptest('current block height', function(t) {
     });
 });
 
-taptest('destroy waits for save and queue save to finish', function(t) {
+taptest('multiple saves result in last save', function(t) {
   t.plan(2);
 
   var joe = new Joe(config);
   joe.on('ready', function() {
-    joe.queueSave(config.wallet); // immediate
-    joe.queueSave(config.wallet); // queued
-    joe.queueSave(config.wallet); // (should be) ignored
-    joe.destroy();
-    joe.on('save', t.pass);
-    joe.on('save:error', t.error);
+    var tasks = [];
+    for (var i = 0; i < 10; i++) {
+      joe.wallet().gapLimit++;
+      tasks.push(joe.save(config.wallet));
+    }
+
+    var gapLimit = joe.wallet().gapLimit;
+    Q.all(tasks)
+      .then(function() {
+        return joe.destroy();
+      })
+      .then(function() {
+        joe = new Joe(config);
+        joe.on('ready', function() {
+          t.equal(joe.wallet().gapLimit, gapLimit);
+          joe.destroy().then(t.pass);
+        });
+      })
+      .done();
   });
 });
 
@@ -96,5 +109,5 @@ taptest('load app models from list of model-creation tx ids', function(t) {
 });
 
 taptest('cleanup', function(t) {
-  fs.unlink(path.resolve(config.wallet.path), t.end);
+  rimraf(path.resolve(config.wallet.path), t.end);
 })
