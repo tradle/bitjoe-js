@@ -9,6 +9,7 @@ var Joe = require('../');
 var fakeKeeper = require('./helpers/fakeKeeper');
 var bufferEqual = require('buffer-equal');
 var extend = require('extend');
+var rimraf = require('rimraf');
 var joes = [];
 var numJoes = 2;
 var MIN_CHARGE = 1e4;
@@ -30,6 +31,7 @@ taptest('setup bitjoe', function(t) {
 
   for (var i = 0; i < numJoes; i++) {
     var conf = extend(true, {}, config);
+    conf.wallet.path += i;
     joes.push(new Joe(conf));
   }
 
@@ -83,7 +85,7 @@ taptest('create a shared encrypted file, load it', function(t) {
   var sender = joes[0];
   var recipients = joes.slice(1);
   console.log('Creating a new file and sharing it');
-  console.warn('This make take a minute');
+  console.warn('This may take a minute');
   var recipientPubKeys = recipients.map(function(joe) {
     var addr = joe.getNextAddress();
     return joe.getPublicKeyForAddress(addr);
@@ -136,7 +138,7 @@ taptest('share an existing file with someone new', function(t) {
   var recipientAddr = recipient.getNextAddress();
   var recipientPubKey = recipient.getPublicKeyForAddress(recipientAddr).toHex();
   console.log('Sharing existing file with: ' + recipientAddr + ' : ' + recipientPubKey);
-  console.warn('This make take a minute or two');
+  console.warn('This may take a minute or two');
 
   var createReq = sender.create().data(file);
   createReq.execute()
@@ -185,6 +187,11 @@ taptest('cleanup', function(t) {
   Q.all(joes.map(function(joe) {
       return joe.destroy();
     }))
+    .then(function() {
+      return Q.all(joes.map(function(j) {
+        return Q.nfcall(rimraf, j.config('wallet').path);
+      }))
+    })
     .done(function() {
       t.end();
     })
@@ -206,8 +213,7 @@ function promiseFund(joe, amount) {
       var balance = joe.getBalance(0);
       if (balance < amount) return;
 
-      joe.removeListener('sync', checkBalance);
-      joe.removeListener('tx', checkBalance);
+      joe.wallet().removeListener('tx', checkBalance);
       resolve();
       return true;
     }
@@ -231,6 +237,6 @@ function endIn(t, timeout) {
 }
 
 function recharge(joe, satoshis) {
-  return joe.charge(1, satoshis || MIN_CHARGE)
+  return joe.charge(3, satoshis || MIN_CHARGE)
     .then(joe.sync);
 }

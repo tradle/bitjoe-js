@@ -6,28 +6,17 @@ var pluck = require('array-pluck');
 var app = require('./fixtures/app');
 var fakeKeeper = require('./helpers/fakeKeeper');
 var DataLoader = require('../lib/dataLoader');
-var common = require('../lib/common');
+var blockHeight = require('../lib/common').currentBlockHeight;
 var Blockchain = require('../lib/commonBlockchains');
 var bitcoin = require('bitcoinjs-lib');
 var Joe = require('../');
-var sharedKeeper = fakeKeeper.forMap({});
-var config = {
-  wallet: {
-    autosave: true,
-    path: './test/test.wallet'
-  },
-  autofund: false,
-  keeper: sharedKeeper,
-  prefix: 'test',
-  networkName: 'testnet',
-  syncInterval: 10000,
-  minConf: 0
-};
+var common = require('./common');
+var config = common.config();
 
 taptest('current block height', function(t) {
   t.plan(1);
 
-  common.currentBlockHeight('testnet')
+  blockHeight('testnet')
     .done(function(height) {
       t.ok(typeof height === 'number');
     });
@@ -41,7 +30,7 @@ taptest('multiple saves result in last save', function(t) {
     var tasks = [];
     for (var i = 0; i < 10; i++) {
       joe.wallet().gapLimit++;
-      tasks.push(joe.save(config.wallet));
+      tasks.push(joe.save());
     }
 
     var gapLimit = joe.wallet().gapLimit;
@@ -50,7 +39,7 @@ taptest('multiple saves result in last save', function(t) {
         return joe.destroy();
       })
       .then(function() {
-        joe = new Joe(config);
+        joe = new Joe(joe.config());
         joe.on('ready', function() {
           t.equal(joe.wallet().gapLimit, gapLimit);
           joe.destroy().then(t.pass);
