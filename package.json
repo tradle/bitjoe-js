@@ -9,7 +9,7 @@
     "jscs": "jscs {*.js,**/*.js} --config node_modules/tradle-style/.jscsrc",
     "test": "node test",
     "test-offline": "node test/offline",
-    "test-online": "node test/basic && node test/endToEnd"
+    "test-online": "node test/online"
   },
   "pre-commit": [
     "jscs",
