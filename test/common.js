@@ -7,6 +7,7 @@ var rimraf = require('rimraf');
 var mkdirp = require('mkdirp');
 var walletsDir = './test/wallets/';
 var crypto = require('crypto');
+var test = require('tape');
 var MIN_CHARGE = 1e4;
 var noop = function() {};
 
@@ -54,37 +55,53 @@ var common = module.exports = {
 
     return arr;
   },
-  recharge: function(joe, satoshis) {
-    return joe.charge(1, satoshis || MIN_CHARGE)
+  recharge: function recharge(joe, satoshis) {
+    return joe.charge(2, satoshis || MIN_CHARGE)
       .then(joe.sync);
   },
   promiseFund: function(joe, amount) {
-    var defer = Q.defer();
-    amount = amount || MIN_CHARGE;
-    joe.on('ready', function() {
-      if (checkBalance()) return;
+    var promise = Q.Promise(function(resolve, reject) {
+      amount = amount || MIN_CHARGE;
+      joe.on('ready', function() {
+        if (checkBalance()) return;
 
-      common.recharge(joe, MIN_CHARGE)
-        .done(checkBalance);
+        common.recharge(joe, MIN_CHARGE)
+          .done(checkBalance);
 
-      joe.wallet().on('tx', checkBalance);
+        joe.wallet().on('tx', checkBalance);
+      });
+
+      function checkBalance() {
+        var balance = joe.getBalance(0);
+        if (balance < amount) return;
+
+        joe.wallet().removeListener('tx', checkBalance);
+        resolve();
+        return true;
+      }
     });
 
-    function checkBalance() {
-      var balance = joe.getBalance(0);
-      if (balance < amount) return;
-
-      joe.removeListener('sync', checkBalance);
-      joe.removeListener('tx', checkBalance);
-      defer.resolve();
-      return true;
-    }
-
-    return defer.promise;
+    return promise;
   },
+
   promiseReady: function(joe) {
     var defer = Q.defer();
     joe.once('ready', defer.resolve);
     return defer.promise;
+  },
+
+  rechargeAndTest: function(joe, satoshis, testName, fn) {
+    if (!joe) return;
+    if (joe.getBalance(0) > 2e4) return test(testName, fn);
+
+    if (typeof satoshis === 'string') {
+      testName = satoshis;
+      satoshis = null;
+    }
+
+    return common.recharge(joe, satoshis)
+      .then(function() {
+        test(testName, fn);
+      })
   }
 }

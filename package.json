@@ -68,6 +68,7 @@
   "devDependencies": {
     "array-pluck": "^1.0.0",
     "browserify-fs": "^1.0.0",
+    "chained-obj": "git://github.com/tradle/chained-obj",
     "equals": "^1.0.0",
     "js-beautify": "^1.5.4",
     "jshint": "latest",

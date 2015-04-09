@@ -7,17 +7,19 @@ var Keys = midentity.Keys;
 var common = require('./common');
 var DATA = new Buffer('blah');
 
-var people = [{
-  firstName: 'Bill',
-  middleName: 'S',
-  lastName: 'Preston'
-}, {
-  firstName: 'Ted',
-  middleName: 'Theodore',
-  lastName: 'Logan'
-}, {
-  firstName: 'Rufus'
-}];
+var people = [
+  {
+    firstName: 'Bill',
+    middleName: 'S',
+    lastName: 'Preston'
+  }, {
+    firstName: 'Ted',
+    middleName: 'Theodore',
+    lastName: 'Logan'
+  }, {
+    firstName: 'Rufus'
+  }
+];
 
 test('recognize txs from contacts in addressbook', function(t) {
   t.plan(2);

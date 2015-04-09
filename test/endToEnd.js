@@ -9,10 +9,12 @@ var Joe = require('../');
 var fakeKeeper = require('./helpers/fakeKeeper');
 var bufferEqual = require('buffer-equal');
 var extend = require('extend');
-var rimraf = require('rimraf');
+// var rimraf = require('rimraf');
+var multipart = require('chained-obj');
+var common = require('./common');
 var joes = [];
 var numJoes = 2;
-var MIN_CHARGE = 1e4;
+// var MIN_CHARGE = 1e4;
 
 taptest('setup bitjoe', function(t) {
   var tasks;
@@ -36,8 +38,8 @@ taptest('setup bitjoe', function(t) {
   }
 
   tasks = joes.map(function(joe, i) {
-    if (i === 0) return promiseFund(joe);
-    else return promiseReady(joe);
+    if (i === 0) return common.promiseFund(joe);
+    else return common.promiseReady(joe);
   })
 
   Q.all(tasks)
@@ -69,10 +71,56 @@ taptest('create a public file, load it', function(t) {
     })
     .then(function(storedFile) {
       t.ok(bufferEqual(storedFile, fileBuf));
-      return recharge(joe);
+      return common.recharge(joe);
     })
     .done(function() {
-      endIn(t, 10000); // throttle
+      endIn(t, 2000); // throttle
+    })
+});
+
+taptest('create a public file + attachment, load it (multipart)', function(t) {
+  if (!joes) return t.end();
+
+  var joe = joes[0]; // funded joe
+  var file = app.models.bodies[0];
+  var attachment = './test/fixtures/logo.png';
+
+  var sentBuf;
+  var mb = multipart.Builder()
+    .data(file)
+    .attach('logo', attachment);
+
+  Q.ninvoke(mb, 'build')
+    .then(function(buf) {
+      sentBuf = buf;
+      // var fileBuf = new Buffer(JSON.stringify(file));
+      var getInfoHash = Q.ninvoke(utils, 'getInfoHash', buf);
+      var createPromise = joe.create()
+        .data(buf)
+        .setPublic(true)
+        .execute();
+
+      return Q.all([
+        getInfoHash,
+        createPromise
+      ]);
+    })
+    .spread(function(infoHash, resp) {
+      t.equal(infoHash, resp.fileKey);
+      return joe.keeper()
+        .getOne(resp.fileKey);
+    })
+    .then(function(storedFile) {
+      t.ok(bufferEqual(storedFile, sentBuf));
+      return Q.ninvoke(multipart.Parser, 'parse', storedFile);
+    })
+    .then(function(parsed) {
+      t.deepEqual(JSON.parse(parsed.data.value), file);
+      t.equal(parsed.attachments.length, 1);
+      return common.recharge(joe);
+    })
+    .done(function() {
+      endIn(t, 2000); // throttle
     })
 });
 
@@ -115,9 +163,9 @@ taptest('create a shared encrypted file, load it', function(t) {
 
       if (--numToGo > 0) return;
 
-      recharge(joe)
+      common.recharge(joe)
         .done(function() {
-          endIn(t, 10000); // throttle
+          endIn(t, 2000); // throttle
         })
     });
 
@@ -138,7 +186,7 @@ taptest('share an existing file with someone new', function(t) {
   var recipientAddr = recipient.getNextAddress();
   var recipientPubKey = recipient.getPublicKeyForAddress(recipientAddr).toHex();
   console.log('Sharing existing file with: ' + recipientAddr + ' : ' + recipientPubKey);
-  console.warn('This may take a minute or two');
+  console.warn('This may take a minute');
 
   var createReq = sender.create().data(file);
   createReq.execute()
@@ -173,7 +221,8 @@ taptest('share an existing file with someone new', function(t) {
     if (info.tx.getId() === shareResp.tx.getId()) {
       recipient.removeListener('file:shared', onSharedFile);
       t.equal(info.key, createResp.fileKey);
-      endIn(t, 10000); // throttle
+      // endIn(t, 2000); // throttle
+      t.end();
     }
   });
 
@@ -187,46 +236,15 @@ taptest('cleanup', function(t) {
   Q.all(joes.map(function(joe) {
       return joe.destroy();
     }))
-    .then(function() {
-      return Q.all(joes.map(function(j) {
-        return Q.nfcall(rimraf, j.config('wallet').path);
-      }))
-    })
+    // .then(function() {
+    //   return Q.all(joes.map(function(j) {
+    //     return Q.nfcall(rimraf, j.config('wallet').path);
+    //   }))
+    // })
     .done(function() {
       t.end();
     })
 });
-
-function promiseFund(joe, amount) {
-  var promise = Q.Promise(function(resolve, reject) {
-    amount = amount || MIN_CHARGE;
-    joe.on('ready', function() {
-      if (checkBalance()) return;
-
-      recharge(joe, MIN_CHARGE)
-        .done(checkBalance);
-
-      joe.wallet().on('tx', checkBalance);
-    });
-
-    function checkBalance() {
-      var balance = joe.getBalance(0);
-      if (balance < amount) return;
-
-      joe.wallet().removeListener('tx', checkBalance);
-      resolve();
-      return true;
-    }
-  });
-
-  return promise;
-}
-
-function promiseReady(joe) {
-  var defer = Q.defer();
-  joe.once('ready', defer.resolve);
-  return defer.promise;
-}
 
 function endIn(t, timeout) {
   console.log('Throttling common-blockchain calls');
@@ -234,9 +252,4 @@ function endIn(t, timeout) {
     console.log('Ready for more common-blockchain calls');
     t.end()
   }, timeout); // hack to throttle common-blockchain api calls
-}
-
-function recharge(joe, satoshis) {
-  return joe.charge(3, satoshis || MIN_CHARGE)
-    .then(joe.sync);
 }
