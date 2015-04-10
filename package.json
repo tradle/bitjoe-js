@@ -62,7 +62,7 @@
     "secure-random": "^1.1.1",
     "testnet-charger": "^0.1.0",
     "tradle-utils": "^0.1.0",
-    "tx-walker": "^1.0.0",
+    "tx-walker": "^1.1.1",
     "typeforce": "^0.1.0",
     "uniq": "^1.0.1"
   },
