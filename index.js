@@ -20,6 +20,7 @@ var debug = require('debug')('bitjoe');
 var path = require('path');
 var utils = require('tradle-utils');
 var levelup = require('level-browserify');
+var mkdirp = require('mkdirp');
 var DataLoader = require('./lib/dataLoader');
 var reemit = require('re-emitter');
 var requireOption = utils.requireOption;
@@ -150,7 +151,16 @@ BitJoe.prototype._initWallet = function(wallet) {
 
 BitJoe.prototype.identity = function(identity) {
   if (identity) {
+    var networkName = this.networkName();
     this._identity = identity;
+    this._keys = this._identity.keys('bitcoin').filter(function(key) {
+      return key.prop('networkName') === networkName;
+    });
+
+    this._fromAddresses = this._keys.map(function(key) {
+      return key.fingerprint();
+    })
+
     if (this._addressBook) this._addressBook.add(identity, true); // replace
   }
 
@@ -276,9 +286,7 @@ BitJoe.prototype.requestConfig = function() {
   conf.addressBook = this._addressBook;
   if (this._identity) {
     conf.identity = this._identity;
-    conf.fromAddresses = this._identity.keys('bitcoin').map(function(key) {
-      return key.prop('address');
-    });
+    conf.fromAddresses = this._fromAddresses;
   }
 
   conf.keeper = this._keeper;
@@ -387,15 +395,34 @@ BitJoe.prototype.charge = function(n, perAddr) {
   var wallet = this._wallet;
   var c = new Charger(wallet);
 
-  for (var i = 0; i < n; i++) {
-    c.charge(wallet.getNextAddress(i + 1), perAddr);
+  if (this._identity) {
+    var from = this._fromAddresses;
+    n = Math.min(n, from.length);
+    while (n--) {
+      c.charge(from[n], perAddr);
+    }
+  }
+  else {
+    for (var i = 0; i < n; i++) {
+      c.charge(wallet.getNextAddress(i + 1), perAddr);
+    }
   }
 
   return Q.ninvoke(c, 'execute');
 }
 
 BitJoe.prototype.getBalance = function(minConf) {
-  return this._wallet.getBalance(typeof minConf === 'undefined' ? this.config('minConf') : minConf);
+  var self = this;
+
+  minConf = typeof minConf === 'undefined' ? this.config('minConf') : minConf;
+  if (!this._identity) return this._wallet.getBalance(minConf);
+
+  return this._wallet.getUnspents(minConf)
+    .reduce(function(memo, u) {
+      if (self._fromAddresses.indexOf(u.address) !== -1) memo += u.value;
+
+      return memo;
+    }, 0);
 }
 
 BitJoe.prototype.getTx = function(txId) {
@@ -427,14 +454,25 @@ BitJoe.prototype.refundToFaucet = function(value) {
     return Q.reject(new Error('Can only return testnet coins'));
 
   var network = bitcoin.networks[this.networkName()];
-  var tx = this._wallet.createTx(faucets.TP, network.dustThreshold + 1, 0, 0);
+  var tx;
+  try {
+    tx = this._wallet.createTx(faucets.TP, network.dustThreshold + 1, 0, 0);
+  } catch (err) {
+    return Q.reject(err);
+  }
+
   var maxRefund = this.getBalance() - network.estimateFee(tx);
   value = value || maxRefund;
 
   if (maxRefund <= 0 || value < maxRefund)
     return Q.reject(new Error('Insufficient funds'));
 
-  tx = this._wallet.createTx(faucets.TP, value, 0, 0);
+  try {
+    tx = this._wallet.createTx(faucets.TP, value, 0, 0);
+  } catch (err) {
+    return Q.reject(err);
+  }
+
   return Q.ninvoke(this._wallet, 'sendTx', tx)
     .then(function() {
       return value;
@@ -530,8 +568,10 @@ BitJoe.prototype.save = function(options) {
     walletStr = cryptoUtils.encrypt(walletStr, options.password);
   }
 
-  var db = this._db(walletPath);
-  return Q.ninvoke(db, 'put', 'wallet', walletStr)
+  return this._db(walletPath)
+    .then(function(db) {
+      return Q.ninvoke(db, 'put', 'wallet', walletStr);
+    })
     .then(function() {
       debug('Saved wallet');
       self.emit('save');
@@ -555,16 +595,19 @@ BitJoe.prototype.wallet = function() {
 }
 
 BitJoe.prototype.currentReceiveAddress = function() {
+  if (this._identity) return this._fromAddresses[0];
+
   return this._wallet.getReceiveAddress();
 }
 
 BitJoe.prototype._db = function(path) {
-  var db = this._dbs[path];
-  if (!db) {
-    db = this._dbs[path] = levelup(path, levelOptions);
-  }
+  var self = this;
 
-  return db;
+  return Q.nfcall(mkdirp, path)
+    .then(function() {
+      var db = self._dbs[path] = self._dbs[path] || levelup(path, levelOptions);
+      return db;
+    });
 }
 
 BitJoe.prototype._loadOrCreateWallet = function(options) {
@@ -576,11 +619,16 @@ BitJoe.prototype._loadOrCreateWallet = function(options) {
   walletPath = path.resolve(walletPath);
   var password = options.password;
 
-  var db = this._db(walletPath);
-  return Q.ninvoke(db, 'get', 'wallet')
+  return this._db(walletPath)
+    .then(function(db) {
+      return Q.ninvoke(db, 'get', 'wallet')
+    })
     .then(function(file) {
-      var json = password ? cryptoUtils.decrypt(file, password) : file;
-      var wallet = common.walletFromJSON(json);
+      if (password) {
+        file = cryptoUtils.decrypt(file, password);
+      }
+
+      var wallet = common.walletFromJSON(file);
       console.log('Found existing wallet');
       return wallet;
     })

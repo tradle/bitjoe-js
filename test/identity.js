@@ -6,18 +6,45 @@ var AddressBook = midentity.AddressBook;
 var Keys = midentity.Keys;
 var common = require('./common');
 var DATA = new Buffer('blah');
+var Joe = require('../');
+var rimraf = require('rimraf');
+var fakeKeeper = require('./helpers/fakeKeeper');
+var sharedKeeper = fakeKeeper.forMap({});
+var config = {
+  wallet: {
+    path: './test/joe.wallet',
+    autosave: true
+  },
+  keeper: sharedKeeper,
+  prefix: 'test',
+  networkName: 'testnet',
+  syncInterval: 10000,
+  minConf: 0
+};
 
+var joe = new Joe(config);
 var people = [
   {
-    firstName: 'Bill',
-    middleName: 'S',
-    lastName: 'Preston'
-  }, {
-    firstName: 'Ted',
-    middleName: 'Theodore',
-    lastName: 'Logan'
-  }, {
-    firstName: 'Rufus'
+    name: {
+      firstName: 'Bill',
+      middleName: 'S',
+      lastName: 'Preston',
+      formatted: 'Bill S. Preston'
+    }
+  },
+  {
+    name: {
+      firstName: 'Ted',
+      middleName: 'Theodore',
+      lastName: 'Logan',
+      formatted: 'Ted Theodore Logan'
+    }
+  },
+  {
+    name: {
+      firstName: 'Rufus',
+      formatted: 'Rufus'
+    }
   }
 ];
 
@@ -32,7 +59,6 @@ test('recognize txs from contacts in addressbook', function(t) {
 
   var me;
   var to = identities[0];
-  var joe = common.mkJoe();
   joe.addressBook(addressBook);
   joe.on('walletready', function() {
     me = new Identity({
@@ -44,22 +70,22 @@ test('recognize txs from contacts in addressbook', function(t) {
     for (var i = 0; i < 3; i++) {
       var addr = joe.wallet().getNextAddress(i);
       var priv = joe.wallet().getPrivateKeyForAddress(addr);
-      me.addKey('bitcoin', new Keys.Bitcoin({
+      me.addKey(new Keys.Bitcoin({
         networkName: joe.config('networkName'),
         priv: priv
       }));
     }
 
     joe.identity(me);
+    common.promiseFund(joe)
+      .then(function() {
+        return joe.create()
+          .data(DATA)
+          .shareWith(firstKey(to).pub())
+          .execute()
+      })
+      .done();
   });
-
-  common.promiseFund(joe)
-    .then(function() {
-      return joe.create()
-        .data(DATA)
-        .shareWith(firstKey(to).pub())
-        .execute()
-    });
 
   joe.once('file', function(info) {
     t.equal(info.from.identity, me);
@@ -68,18 +94,20 @@ test('recognize txs from contacts in addressbook', function(t) {
 });
 
 test('cleanup', function(t) {
-  common.cleanup(t.end);
+  // common.cleanup(t.end);
+  joe.destroy()
+    .done(function() {
+      rimraf(config.wallet.path, t.end);
+    });
 })
 
 function makeIdentities() {
   return people.map(function(p) {
-    var id = new Identity(p);
-    id.addKey('bitcoin', new Keys.Bitcoin({
-      networkName: 'testnet',
-      pub: Keys.Bitcoin.gen('testnet').pub()
-    }));
-
-    return id;
+    return Identity.fromJSON(p)
+      .addKey(new Keys.Bitcoin({
+        networkName: 'testnet',
+        pub: Keys.Bitcoin.gen('testnet').pub()
+      }))
   });
 }
 

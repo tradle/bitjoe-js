@@ -56,7 +56,7 @@ var common = module.exports = {
     return arr;
   },
   recharge: function recharge(joe, satoshis) {
-    return joe.charge(2, satoshis || MIN_CHARGE)
+    return joe.charge(4, satoshis || MIN_CHARGE)
       .then(joe.sync);
   },
   promiseFund: function(joe, amount) {
@@ -76,7 +76,7 @@ var common = module.exports = {
         if (balance < amount) return;
 
         joe.wallet().removeListener('tx', checkBalance);
-        resolve();
+        setTimeout(resolve, 10000);
         return true;
       }
     });
