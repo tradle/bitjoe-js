@@ -41,7 +41,7 @@
     "bip32-utils": "^0.2.1",
     "bip39": "^2.1.0",
     "bitcoinjs-lib": "^1.4.1",
-    "bitkeeper-client-js": "git://github.com/tradle/bitkeeper-client-js.git",
+    "bitkeeper-client-js": "git://github.com/tradle/bitkeeper-client-js.git#dev",
     "bs58": "^2.0.0",
     "buffer-equal": "0.0.1",
     "cb-blockr": "^3.0.2",
