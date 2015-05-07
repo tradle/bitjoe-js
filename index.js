@@ -20,7 +20,6 @@ var debug = require('debug')('bitjoe');
 var path = require('path');
 var utils = require('tradle-utils');
 var levelup = require('level-browserify');
-var mkdirp = require('mkdirp');
 var DataLoader = require('./lib/dataLoader');
 var reemit = require('re-emitter');
 var requireOption = utils.requireOption;
@@ -538,7 +537,7 @@ BitJoe.prototype.destroy = function() {
 
   var tasks = [];
   for (var path in this._dbs) {
-    tasks.push(Q.ninvoke(this._dbs[path], 'close'));
+    tasks.push(Q.ninvoke(this._db(path), 'close'));
   }
 
   clearTimeout(this._syncTimeout);
@@ -568,10 +567,7 @@ BitJoe.prototype.save = function(options) {
     walletStr = cryptoUtils.encrypt(walletStr, options.password);
   }
 
-  return this._db(walletPath)
-    .then(function(db) {
-      return Q.ninvoke(db, 'put', 'wallet', walletStr);
-    })
+  return Q.ninvoke(this._db(walletPath), 'put', 'wallet', walletStr)
     .then(function() {
       debug('Saved wallet');
       self.emit('save');
@@ -601,13 +597,8 @@ BitJoe.prototype.currentReceiveAddress = function() {
 }
 
 BitJoe.prototype._db = function(path) {
-  var self = this;
-
-  return Q.nfcall(mkdirp, path)
-    .then(function() {
-      var db = self._dbs[path] = self._dbs[path] || levelup(path, levelOptions);
-      return db;
-    });
+  this._dbs[path] = this._dbs[path] || levelup(path, levelOptions);
+  return this._dbs[path]
 }
 
 BitJoe.prototype._loadOrCreateWallet = function(options) {
@@ -619,10 +610,7 @@ BitJoe.prototype._loadOrCreateWallet = function(options) {
   walletPath = path.resolve(walletPath);
   var password = options.password;
 
-  return this._db(walletPath)
-    .then(function(db) {
-      return Q.ninvoke(db, 'get', 'wallet')
-    })
+  return Q.ninvoke(this._db(walletPath), 'get', 'wallet')
     .then(function(file) {
       if (password) {
         file = cryptoUtils.decrypt(file, password);
