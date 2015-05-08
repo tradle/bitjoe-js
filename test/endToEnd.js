@@ -11,6 +11,7 @@ var bufferEqual = require('buffer-equal');
 var extend = require('extend');
 // var rimraf = require('rimraf');
 var multipart = require('chained-obj');
+var leveldown = require('leveldown')
 var common = require('./common');
 var joes = [];
 var numJoes = 2;
@@ -24,6 +25,7 @@ taptest('setup bitjoe', function(t) {
       path: './test/joe.wallet',
       autosave: true
     },
+    leveldown: leveldown,
     keeper: sharedKeeper,
     prefix: 'test',
     networkName: 'testnet',

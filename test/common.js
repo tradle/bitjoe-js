@@ -7,6 +7,7 @@ var rimraf = require('rimraf');
 var mkdirp = require('mkdirp');
 var walletsDir = './test/wallets/';
 var crypto = require('crypto');
+var leveldown = require('leveldown')
 var test = require('tape');
 var MIN_CHARGE = 1e4;
 var noop = function() {};
@@ -40,6 +41,7 @@ var common = module.exports = {
         path: walletsDir + 'joe.' + crypto.randomBytes(32).toString('hex') + '.wallet',
         autosave: true
       },
+      leveldown: leveldown,
       keeper: fakeKeeper.forMap({}),
       prefix: 'test',
       networkName: 'testnet',

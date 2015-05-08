@@ -15,6 +15,7 @@ var config = {
     path: './test/joe.wallet',
     autosave: true
   },
+  leveldown: 'leveldown',
   keeper: sharedKeeper,
   prefix: 'test',
   networkName: 'testnet',

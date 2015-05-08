@@ -603,7 +603,8 @@ BitJoe.prototype.currentReceiveAddress = function() {
 }
 
 BitJoe.prototype._db = function(path) {
-  this._dbs[path] = this._dbs[path] || levelup(path, levelOptions);
+  var opts = extend({ db: this.config('leveldown') }, levelOptions)
+  this._dbs[path] = this._dbs[path] || levelup(path, opts);
   return this._dbs[path]
 }
 
