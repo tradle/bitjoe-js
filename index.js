@@ -19,11 +19,10 @@ var KeeperAPI = require('bitkeeper-client-js');
 var debug = require('debug')('bitjoe');
 var path = require('path');
 var utils = require('tradle-utils');
-var levelup = require('level-browserify');
+var levelup = require('levelup');
 var DataLoader = require('./lib/dataLoader');
 var reemit = require('re-emitter');
-var requireOption = utils.requireOption;
-var requireParam = utils.requireParam;
+var typeforce = require('typeforce')
 var Charger = require('testnet-charger');
 var STABLE_AFTER = 10; // confirmations
 var levelOptions = {
@@ -39,6 +38,10 @@ module.exports = BitJoe;
 
 function BitJoe(config) {
   var self = this;
+
+  typeforce({
+    leveldown: 'Function'
+  }, config)
 
   EventEmitter.call(this);
 
@@ -320,7 +323,7 @@ BitJoe.prototype._setupStorage = function() {
 }
 
 BitJoe.prototype.autosave = function(path) {
-  requireParam('path', path);
+  typeforce('String', path);
 
   var self = this;
 
@@ -557,8 +560,11 @@ BitJoe.prototype.save = function(options) {
   var self = this;
   options = extend({}, this.config('wallet'), options || {});
 
-  var walletPath = requireOption(options, 'path');
-  walletPath = path.resolve(walletPath);
+  typeforce({
+    path: 'String'
+  }, options)
+
+  var walletPath = path.resolve(options.path);
 
   debug('Saving wallet');
 
@@ -602,7 +608,7 @@ BitJoe.prototype._db = function(path) {
 }
 
 BitJoe.prototype._loadOrCreateWallet = function(options) {
-  requireParam(options, 'options');
+  typeforce('Object', options);
 
   var walletPath = options.path;
   if (!walletPath) return newWallet(options);
