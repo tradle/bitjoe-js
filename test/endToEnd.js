@@ -1,12 +1,12 @@
 
 'use strict';
 
-var taptest = require('tape');
+var test = require('tape');
 var utils = require('tradle-utils');
 var Q = require('q');
+var FakeKeeper = require('tradle-test-helpers').FakeKeeper
 var app = require('./fixtures/app');
 var Joe = require('../');
-var fakeKeeper = require('./helpers/fakeKeeper');
 var bufferEqual = require('buffer-equal');
 var extend = require('extend');
 // var rimraf = require('rimraf');
@@ -17,9 +17,9 @@ var joes = [];
 var numJoes = 2;
 // var MIN_CHARGE = 1e4;
 
-taptest('setup bitjoe', function(t) {
+test('setup bitjoe', function(t) {
   var tasks;
-  var sharedKeeper = fakeKeeper.forMap({});
+  var sharedKeeper = FakeKeeper.forMap({});
   var config = {
     wallet: {
       path: './test/joe.wallet',
@@ -50,7 +50,7 @@ taptest('setup bitjoe', function(t) {
     })
 });
 
-taptest('create a public file, load it', function(t) {
+test('create a public file, load it', function(t) {
   if (!joes) return t.end();
 
   var joe = joes[0]; // funded joe
@@ -80,7 +80,7 @@ taptest('create a public file, load it', function(t) {
     })
 });
 
-taptest('create a public file + attachment, load it (multipart)', function(t) {
+test('create a public file + attachment, load it (multipart)', function(t) {
   if (!joes) return t.end();
 
   var joe = joes[0]; // funded joe
@@ -90,7 +90,10 @@ taptest('create a public file + attachment, load it (multipart)', function(t) {
   var sentBuf;
   var mb = multipart.Builder()
     .data(file)
-    .attach('logo', attachment);
+    .attach({
+      name: 'logo',
+      path: attachment
+    });
 
   Q.ninvoke(mb, 'build')
     .then(function(buf) {
@@ -117,7 +120,7 @@ taptest('create a public file + attachment, load it (multipart)', function(t) {
       return Q.ninvoke(multipart.Parser, 'parse', storedFile);
     })
     .then(function(parsed) {
-      t.deepEqual(JSON.parse(parsed.data.value), file);
+      t.deepEqual(parsed.data.value, file);
       t.equal(parsed.attachments.length, 1);
       return common.recharge(joe);
     })
@@ -126,7 +129,7 @@ taptest('create a public file + attachment, load it (multipart)', function(t) {
     })
 });
 
-taptest('create a shared encrypted file, load it', function(t) {
+test('create a shared encrypted file, load it', function(t) {
   if (!joes) return t.end();
 
   t.timeoutAfter(200000);
@@ -175,7 +178,7 @@ taptest('create a shared encrypted file, load it', function(t) {
   });
 });
 
-taptest('share an existing file with someone new', function(t) {
+test('share an existing file with someone new', function(t) {
   if (!joes) return t.end();
 
   t.timeoutAfter(200000);
@@ -211,7 +214,7 @@ taptest('share an existing file with someone new', function(t) {
     });
 
   recipient.on('file:permission', function onPermission(info) {
-    if (info.tx.getId() === shareResp.tx.getId()) {
+    if (info.tx.id === shareResp.tx.getId()) {
       recipient.removeListener('file:permission', onPermission);
       var permission = shareResp.permission;
       t.ok(permission);
@@ -220,7 +223,7 @@ taptest('share an existing file with someone new', function(t) {
   });
 
   recipient.on('file:shared', function onSharedFile(info) {
-    if (info.tx.getId() === shareResp.tx.getId()) {
+    if (info.tx.id === shareResp.tx.getId()) {
       recipient.removeListener('file:shared', onSharedFile);
       t.equal(info.key, createResp.fileKey);
       // endIn(t, 2000); // throttle
@@ -232,7 +235,7 @@ taptest('share an existing file with someone new', function(t) {
   recipient.on('error', t.error);
 });
 
-taptest('cleanup', function(t) {
+test('cleanup', function(t) {
   if (!joes) return t.end();
 
   Q.all(joes.map(function(joe) {

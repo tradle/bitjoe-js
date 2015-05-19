@@ -1,2 +1,4 @@
-require('./offline');
-require('./online');
+
+require('./basic');
+require('./identity');
+require('./endToEnd');

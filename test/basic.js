@@ -1,19 +1,13 @@
-var taptest = require('tape');
+var test = require('tape');
 var Q = require('q');
 var rimraf = require('rimraf');
 var path = require('path');
-var pluck = require('array-pluck');
-var app = require('./fixtures/app');
-var fakeKeeper = require('./helpers/fakeKeeper');
-var DataLoader = require('../lib/dataLoader');
 var blockHeight = require('../lib/common').currentBlockHeight;
-var Blockchain = require('../lib/commonBlockchains');
-var bitcoin = require('bitcoinjs-lib');
 var Joe = require('../');
 var common = require('./common');
 var config = common.config();
 
-taptest('current block height', function(t) {
+test('current block height', function(t) {
   t.plan(1);
 
   blockHeight('testnet')
@@ -22,7 +16,7 @@ taptest('current block height', function(t) {
     });
 });
 
-taptest('multiple saves result in last save', function(t) {
+test('multiple saves result in last save', function(t) {
   t.plan(2);
 
   var joe = new Joe(config);
@@ -49,7 +43,7 @@ taptest('multiple saves result in last save', function(t) {
   });
 });
 
-taptest('1 sync at a time', function(t) {
+test('1 sync at a time', function(t) {
   t.plan(2);
 
   var joe = new Joe(config);
@@ -60,43 +54,6 @@ taptest('1 sync at a time', function(t) {
   });
 });
 
-taptest('load app models from list of model-creation tx ids', function(t) {
-  t.plan(1);
-
-  var network = 'testnet';
-  var api = new Blockchain(network);
-  var models = app.models.bodies;
-  var txIds = app.models.txIds;
-  var loaded = [];
-  Q.all([
-      Q.ninvoke(api.transactions, 'get', txIds),
-      fakeKeeper.forData(models)
-    ])
-    .spread(function(txs, keeper) {
-      txs = txs.map(function(tx) {
-        return bitcoin.Transaction.fromHex(tx.txHex);
-      });
-
-      var loader = new DataLoader({
-        prefix: 'tradle',
-        networkName: network,
-        keeper: keeper
-      });
-
-      ['file:public', 'file:shared'].forEach(function(event) {
-        loader.on(event, function(file) {
-          loaded.push(file);
-        });
-      });
-
-      return loader.load(txs);
-    })
-    .then(function() {
-      t.deepEqual(pluck(loaded, 'file'), models);
-    })
-    .done();
-});
-
-taptest('cleanup', function(t) {
+test('cleanup', function(t) {
   rimraf(path.resolve(config.wallet.path), t.end);
 })

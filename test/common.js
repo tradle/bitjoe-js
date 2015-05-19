@@ -1,7 +1,7 @@
 
 var Q = require('q');
 var Joe = require('../');
-var fakeKeeper = require('./helpers/fakeKeeper');
+var FakeKeeper = require('tradle-test-helpers').FakeKeeper;
 var joes = [];
 var rimraf = require('rimraf');
 var mkdirp = require('mkdirp');
@@ -42,7 +42,7 @@ var common = module.exports = {
         autosave: true
       },
       leveldown: leveldown,
-      keeper: fakeKeeper.forMap({}),
+      keeper: FakeKeeper.forMap({}),
       prefix: 'test',
       networkName: 'testnet',
       syncInterval: 10000,

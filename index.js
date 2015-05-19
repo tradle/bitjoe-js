@@ -5,7 +5,6 @@ var EventEmitter = require('events').EventEmitter;
 var common = require('./lib/common');
 var MIN_BALANCE = 1e5;
 var bitcoin = require('bitcoinjs-lib');
-var cryptoUtils = require('./lib/crypto');
 var CBWallet = require('cb-wallet');
 // override CBWallet.API
 CBWallet.API = require('cb-blockr');
@@ -20,10 +19,11 @@ var debug = require('debug')('bitjoe');
 var path = require('path');
 var utils = require('tradle-utils');
 var levelup = require('levelup');
-var DataLoader = require('./lib/dataLoader');
+var DataLoader = require('chainloader')
 var reemit = require('re-emitter');
 var typeforce = require('typeforce')
 var Charger = require('testnet-charger');
+var cryptoUtils = require('./lib/crypto');
 var STABLE_AFTER = 10; // confirmations
 var levelOptions = {
   valueEncoding: 'json'
@@ -156,7 +156,7 @@ BitJoe.prototype.identity = function(identity) {
     var networkName = this.networkName();
     this._identity = identity;
     this._keys = this._identity.keys('bitcoin').filter(function(key) {
-      return key.prop('networkName') === networkName;
+      return key.get('networkName') === networkName;
     });
 
     this._fromAddresses = this._keys.map(function(key) {
@@ -570,7 +570,7 @@ BitJoe.prototype.save = function(options) {
 
   var walletStr = this._wallet.serialize();
   if (options.password) {
-    walletStr = cryptoUtils.encrypt(walletStr, options.password);
+    walletStr = utils.encrypt(walletStr, options.password);
   }
 
   return Q.ninvoke(this._db(walletPath), 'put', 'wallet', walletStr)
@@ -620,7 +620,7 @@ BitJoe.prototype._loadOrCreateWallet = function(options) {
   return Q.ninvoke(this._db(walletPath), 'get', 'wallet')
     .then(function(file) {
       if (password) {
-        file = cryptoUtils.decrypt(file, password);
+        file = utils.decrypt(file, password);
       }
 
       var wallet = common.walletFromJSON(file);

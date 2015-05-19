@@ -1,6 +1,6 @@
 
-var taptest = require('tape');
-var fakeKeeper = require('./helpers/fakeKeeper');
+var test = require('tape');
+var FakeKeeper = require('tradle-test-helpers').FakeKeeper
 var identity = require('./fixtures/identity');
 var Bitjoe = require('../');
 var extend = require('extend');
@@ -9,14 +9,14 @@ var baseConfig = {
   wallet: {
     autosave: false
   },
-  keeper: fakeKeeper.empty(),
+  keeper: FakeKeeper.empty(),
   prefix: 'test',
   networkName: 'testnet',
   syncInterval: 10000,
   minConf: 0
 };
 
-taptest('plugin changes file', function(t) {
+test('plugin changes file', function(t) {
   var joe = new Bitjoe(baseConfig);
 
   var f1 = {
@@ -72,7 +72,7 @@ taptest('plugin changes file', function(t) {
   });
 });
 
-taptest('plugin gets called on outgoing file', function(t) {
+test('plugin gets called on outgoing file', function(t) {
   t.plan(1);
 
   var config = extend({}, baseConfig);

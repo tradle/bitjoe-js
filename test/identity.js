@@ -6,16 +6,17 @@ var AddressBook = midentity.AddressBook;
 var Keys = midentity.Keys;
 var common = require('./common');
 var DATA = new Buffer('blah');
-var Joe = require('../');
 var rimraf = require('rimraf');
-var fakeKeeper = require('./helpers/fakeKeeper');
-var sharedKeeper = fakeKeeper.forMap({});
+var leveldown = require('leveldown')
+var FakeKeeper = require('tradle-test-helpers').FakeKeeper
+var Joe = require('../');
+var sharedKeeper = FakeKeeper.forMap({});
 var config = {
   wallet: {
     path: './test/joe.wallet',
     autosave: true
   },
-  leveldown: 'leveldown',
+  leveldown: leveldown,
   keeper: sharedKeeper,
   prefix: 'test',
   networkName: 'testnet',
