@@ -1,6 +1,5 @@
+function FakePlugin () {}
 
-function FakePlugin() {}
-
-FakePlugin.prototype.process = function(obj) {
-  obj._processed = true;
+FakePlugin.prototype.process = function (obj) {
+  obj._processed = true
 }

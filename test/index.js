@@ -1,4 +1,3 @@
-
-require('./basic');
-require('./identity');
-require('./endToEnd');
+require('./basic')
+require('./identity')
+require('./endToEnd')

@@ -1,16 +1,15 @@
-
-var test = require('tape');
-var midentity = require('midentity');
-var Identity = midentity.Identity;
-var AddressBook = midentity.AddressBook;
-var Keys = midentity.Keys;
-var common = require('./common');
-var DATA = new Buffer('blah');
-var rimraf = require('rimraf');
+var test = require('tape')
+var midentity = require('midentity')
+var Identity = midentity.Identity
+var AddressBook = midentity.AddressBook
+var Keys = midentity.Keys
+var common = require('./common')
+var DATA = new Buffer('blah')
+var rimraf = require('rimraf')
 var leveldown = require('leveldown')
 var FakeKeeper = require('tradle-test-helpers').FakeKeeper
-var Joe = require('../');
-var sharedKeeper = FakeKeeper.forMap({});
+var Joe = require('../')
+var sharedKeeper = FakeKeeper.forMap({})
 var config = {
   wallet: {
     path: './test/joe.wallet',
@@ -22,9 +21,9 @@ var config = {
   networkName: 'testnet',
   syncInterval: 10000,
   minConf: 0
-};
+}
 
-var joe = new Joe(config);
+var joe = new Joe(config)
 var people = [
   {
     name: {
@@ -48,21 +47,21 @@ var people = [
       formatted: 'Rufus'
     }
   }
-];
+]
 
-test('recognize txs from contacts in addressbook', function(t) {
-  t.plan(2);
+test('recognize txs from contacts in addressbook', function (t) {
+  t.plan(2)
 
-  var addressBook = new AddressBook();
-  var identities = makeIdentities();
-  identities.forEach(function(id) {
-    addressBook.add(id);
-  });
+  var addressBook = new AddressBook()
+  var identities = makeIdentities()
+  identities.forEach(function (id) {
+    addressBook.add(id)
+  })
 
-  var me;
-  var to = identities[0];
-  joe.addressBook(addressBook);
-  joe.on('walletready', function() {
+  var me
+  var to = identities[0]
+  joe.addressBook(addressBook)
+  joe.on('walletready', function () {
     me = new Identity({
       firstName: 'Me',
       middleName: 'Baby',
@@ -70,49 +69,49 @@ test('recognize txs from contacts in addressbook', function(t) {
     })
 
     for (var i = 0; i < 3; i++) {
-      var addr = joe.wallet().getNextAddress(i);
-      var priv = joe.wallet().getPrivateKeyForAddress(addr);
+      var addr = joe.wallet().getNextAddress(i)
+      var priv = joe.wallet().getPrivateKeyForAddress(addr)
       me.addKey(new Keys.Bitcoin({
         networkName: joe.config('networkName'),
         priv: priv
-      }));
+      }))
     }
 
-    joe.identity(me);
+    joe.identity(me)
     common.promiseFund(joe)
-      .then(function() {
+      .then(function () {
         return joe.create()
           .data(DATA)
           .shareWith(firstKey(to).pub())
           .execute()
       })
-      .done();
-  });
+      .done()
+  })
 
-  joe.once('file', function(info) {
-    t.equal(info.from.identity, me);
-    t.equal(info.to.identity, to);
-  });
-});
-
-test('cleanup', function(t) {
-  // common.cleanup(t.end);
-  joe.destroy()
-    .done(function() {
-      rimraf(config.wallet.path, t.end);
-    });
+  joe.once('file', function (info) {
+    t.equal(info.from.identity, me)
+    t.equal(info.to.identity, to)
+  })
 })
 
-function makeIdentities() {
-  return people.map(function(p) {
+test('cleanup', function (t) {
+  // common.cleanup(t.end)
+  joe.destroy()
+    .done(function () {
+      rimraf(config.wallet.path, t.end)
+    })
+})
+
+function makeIdentities () {
+  return people.map(function (p) {
     return Identity.fromJSON(p)
       .addKey(new Keys.Bitcoin({
         networkName: 'testnet',
         pub: Keys.Bitcoin.gen('testnet').pub()
       }))
-  });
+  })
 }
 
-function firstKey(identity, category) {
-  return identity.keys(category || 'bitcoin')[0];
+function firstKey (identity, category) {
+  return identity.keys(category || 'bitcoin')[0]
 }
