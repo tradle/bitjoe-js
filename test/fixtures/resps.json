@@ -1,0 +1,38 @@
+[
+  {
+    "fileKey": "8e2b8d39cf77de22a028e26769003b29a43348ac",
+    "permissions": {},
+    "public": {
+      "038912ba5f9859fcdf3f9474b87d95f20c6aeb4a5fc5c8366510562bbcb1d2088a": {
+        "txId": "f86fb2bab40d84d4e89dfb3b554a1563626a25dcace500826606585177f22c38",
+        "txUrl": "http://tbtc.blockr.io/tx/info/f86fb2bab40d84d4e89dfb3b554a1563626a25dcace500826606585177f22c38"
+      }
+    }
+  },
+  {
+  "fileKey": "2cedcb947f58610f45f2f31c30aba8907274613a",
+    "permissions": {},
+    "public": {
+      "038912ba5f9859fcdf3f9474b87d95f20c6aeb4a5fc5c8366510562bbcb1d2088a": {
+        "txId": "c97be5aac9e47442e5ddda794c93dee657c655e432e3c831815cf45a579b4eaa",
+        "txUrl": "http://tbtc.blockr.io/tx/info/c97be5aac9e47442e5ddda794c93dee657c655e432e3c831815cf45a579b4eaa"
+      }
+    }
+  },
+  {
+    "fileKey": "fe1a956ab380fac75413fb73c0c5b30f11518124",
+    "permissions": {
+      "03e8fa6fae66a7da4f706c9acf8fca301fff5484b330dda7f9a610353060846126": {
+        "txId": "2e3bcfb394e917704ebb70c2570bc45f3928485a5fc69484436fedf3f678fef9",
+        "txUrl": "http://tbtc.blockr.io/tx/info/2e3bcfb394e917704ebb70c2570bc45f3928485a5fc69484436fedf3f678fef9",
+        "key": "51dd7c56596ed43a9f6d8eaaaa1ec1a78e81de98"
+      },
+      "030e1021ebbbae7d425532fce0a8fda9e024e42f693027e9c4130a85f56e963f3a": {
+        "txId": "8cedd45a97689a09021a01da84a6d914216342c5dd291f21c963771f35ce26c6",
+        "txUrl": "http://tbtc.blockr.io/tx/info/8cedd45a97689a09021a01da84a6d914216342c5dd291f21c963771f35ce26c6",
+        "key": "3012abba72f239a70ad207c78e4afdb68adfcad3"
+      }
+    },
+    "public": {}
+  }
+]
