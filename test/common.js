@@ -1,9 +1,15 @@
 var Joe = require('../')
+var bitcoin = require('bitcoinjs-lib')
 var helpers = require('tradle-test-helpers')
 var FakeKeeper = helpers.FakeKeeper
 var fakeWallet = helpers.fakeWallet
+var ChainLoader = require('chainloader')
+var mi = require('midentity')
+var Identity = mi.Identity
+var AddressBook = mi.AddressBook
+var Keys = mi.Keys
 
-module.exports = {
+var common = module.exports = {
   nulls: function (size) {
     var arr = []
     while (size--) {
@@ -12,13 +18,64 @@ module.exports = {
 
     return arr
   },
-  mkJoe: function (privateWif, balance) {
+  mkJoe: function (privateWif, sendFn) {
+    var wallet = fakeWallet(privateWif, 500000)
+    if (sendFn) {
+      var send = wallet.send
+      wallet.send = function () {
+        var spender = send.apply(wallet, arguments)
+        // var execute = spender.execute
+        spender._spend = function (cb) {
+          sendFn(this.tx)
+          cb(null, this.tx)
+        }
+
+        return spender
+      }
+    }
+
     return new Joe({
-      wallet: fakeWallet(privateWif, balance || 500000),
+      wallet: wallet,
       keeper: FakeKeeper.empty(),
       prefix: 'test',
       networkName: 'testnet',
       minConf: 0
+    })
+  },
+  identityFor: function (key, networkName) {
+    var priv, pub
+    if (key.pub) {
+      priv = key
+      pub = key.pub
+    } else {
+      pub = key
+    }
+
+    return new Identity()
+      .addKey(new Keys.Bitcoin({
+        priv: priv,
+        pub: pub,
+        networkName: networkName || 'testnet',
+        purpose: 'file-sharing'
+      }))
+  },
+  chainloaderFor: function (joe, friends) {
+    var net = joe.config('networkName')
+    var addressBook
+    if (friends) {
+      addressBook = new AddressBook()
+      friends.forEach(function (pk) {
+        addressBook.add(common.identityFor(bitcoin.ECKey.fromWIF(pk)))
+      })
+    }
+
+    return new ChainLoader({
+      wallet: joe.wallet(),
+      keeper: joe.keeper(),
+      networkName: net,
+      prefix: joe.config('prefix'),
+      identity: common.identityFor(joe.wallet().priv, net),
+      addressBook: addressBook
     })
   }
 }
