@@ -12,7 +12,11 @@ module.exports = BitJoe
 
 function BitJoe (options) {
   typeforce({
-    wallet: 'Object'
+    wallet: 'Object',
+    keeper: 'Object',
+    networkName: 'String',
+    minConf: 'Number',
+    prefix: 'String'
   }, options)
 
   typeforce({
@@ -46,11 +50,14 @@ BitJoe.prototype.share = function () {
 }
 
 BitJoe.prototype.requestConfig = function () {
-  var conf = common.pick(this._options, 'prefix', 'minConf', 'networkName')
-  conf.addressBook = this._addressBook
-  conf.keeper = this._keeper
-  conf.wallet = this._wallet
-  return conf
+  return common.pick(this._options,
+    'prefix',
+    'minConf',
+    'networkName',
+    'keeper',
+    'wallet',
+    'addressBook'
+  )
 }
 
 BitJoe.prototype.wallet = function () {
