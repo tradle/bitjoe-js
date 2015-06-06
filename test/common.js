@@ -19,7 +19,11 @@ var common = module.exports = {
     return arr
   },
   mkJoe: function (privateWif, sendFn) {
-    var wallet = fakeWallet(privateWif, 500000)
+    var wallet = fakeWallet({
+      priv: privateWif,
+      unspents: [500000]
+    })
+
     if (sendFn) {
       var send = wallet.send
       wallet.send = function () {
@@ -31,6 +35,11 @@ var common = module.exports = {
         }
 
         return spender
+      }
+
+      wallet.sendTx = function (tx, cb) {
+        sendFn(tx)
+        cb(null, tx)
       }
     }
 

@@ -40,16 +40,12 @@ test('create a public file, load it', function (t) {
     .execute()
 
   Q.all([
-    getInfoHash,
-    createPromise
-  ])
+      getInfoHash,
+      createPromise
+    ])
     .spread(function (infoHash, resp) {
-      t.equal(infoHash, resp.fileKey)
-      t.deepEqual(resp, resps[0])
-      t.deepEqual(getTxIds(txs), [
-        '0b5cd0e1495a08b2bce2d56ed7b31afb897d296e8ccd0bc03f71b8405d966d0b'
-      ])
-
+      t.equal(infoHash, resp.key)
+      compareResps(t, resp, resps[0])
       return chainloader.load(txs)
     })
     .done(function (loaded) {
@@ -87,6 +83,7 @@ test('create a public file + attachment, load it (multipart)', function (t) {
       var getInfoHash = Q.ninvoke(utils, 'getInfoHash', buf)
       var createPromise = joe.create()
         .data(buf)
+        .shareWith(bitcoin.ECKey.fromWIF(friends[0]).pub)
         .setPublic(true)
         .execute()
 
@@ -96,12 +93,8 @@ test('create a public file + attachment, load it (multipart)', function (t) {
       ])
     })
     .spread(function (infoHash, resp) {
-      t.equal(infoHash, resp.fileKey)
-      t.deepEqual(resp, resps[1])
-      t.deepEqual(getTxIds(txs), [
-        'f9060668201323e0211ea7ced4dc2e3fd62c7e6c3a040fe04a51ccfa45844c5f'
-      ])
-
+      t.equal(infoHash, resp.key)
+      compareResps(t, resp, resps[1])
       return chainloader.load(txs)
     })
     .then(function (loaded) {
@@ -137,7 +130,7 @@ test('create a shared encrypted file, load it', function (t) {
     .shareWith(friendPubs)
     .execute()
     .then(function (resp) {
-      t.deepEqual(resp, resps[2])
+      compareResps(t, resp, resps[2])
       return checkShared(t, txs, chainloader)
     })
     .done(t.end)
@@ -161,10 +154,10 @@ test('share an existing file with someone new', function (t) {
   var friendPub = bitcoin.ECKey.fromWIF(friends[1]).pub
   createReq.execute()
     .then(function (resp) {
-      t.equal(resp.fileKey, 'fe1a956ab380fac75413fb73c0c5b30f11518124')
+      t.equal(resp.key, 'fe1a956ab380fac75413fb73c0c5b30f11518124')
       return joe.share()
         .shareAccessWith(friendPub)
-        .shareAccessTo(resp.fileKey, createReq._symmetricKey)
+        .shareAccessTo(resp.key, createReq._symmetricKey)
         .execute()
     })
     .then(function (resp) {
@@ -181,10 +174,9 @@ function getTxIds (txs) {
 }
 
 function checkShared (t, txs, chainloader) {
-  t.deepEqual(getTxIds(txs), [
-    '7bb841e1026fbe80932cad0a2257d4a8f896927681dd7ff301b8f2b9b67107b5',
-    '44e04bbd7d6546fcf5962c0b5440d99c43c91730683bae3d674e31e007ef75f4'
-  ])
+  t.deepEqual(getTxIds(txs), resps[2].shares.map(function (s) {
+    return s.txId
+  }))
 
   return chainloader.load(txs)
     .then(function (loaded) {
@@ -202,3 +194,18 @@ function checkShared (t, txs, chainloader) {
       t.equal(loaded[1].permissionKey, '3012abba72f239a70ad207c78e4afdb68adfcad3')
     })
 }
+
+function compareResps (t, actual, expected) {
+  t.deepEqual(actual.key, expected.key)
+  expected.shares.forEach(function (s, i) {
+    for (var p in s) {
+      var val = actual.shares[i][p]
+      if (p === 'tx') {
+        val = val.toHex()
+      }
+
+      t.equal(s[p], val)
+    }
+  })
+}
+

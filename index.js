@@ -1,55 +1,36 @@
 'use strict'
 
-var EventEmitter = require('events').EventEmitter
 var common = require('./lib/common')
-var EventEmitter = require('events').EventEmitter
-var inherits = require('util').inherits
 var requests = require('./lib/requests')
 var extend = require('extend')
 var KeeperAPI = require('bitkeeper-client-js')
-var debug = require('debug')('bitjoe')
 var utils = require('tradle-utils')
 var typeforce = require('typeforce')
 var Charger = require('testnet-charger')
 
 module.exports = BitJoe
 
-function BitJoe (config) {
+function BitJoe (options) {
   typeforce({
     wallet: 'Object'
-  }, config)
+  }, options)
 
-  EventEmitter.call(this)
+  typeforce({
+    priv: 'Object',
+    pub: 'Object',
+    addressString: 'String',
+    balance: 'Function'
+  }, options.wallet)
 
   utils.bindPrototypeFunctions(this)
 
   this._plugins = Object.create(null)
-  this._config = extend({}, config || {})
-  var keeper = this.config('keeper')
+  this._options = extend({}, options || {})
+  var keeper = this.option('keeper')
   this._keeper = keeper.isKeeper ? keeper : new KeeperAPI(keeper)
 
   this._dbs = {}
-  this._wallet = config.wallet
-  this.init()
-}
-
-inherits(BitJoe, EventEmitter)
-
-BitJoe.prototype.init = function () {
-  var self = this
-
-  if (this._ready) return
-
-  this._ready = true
-
-  console.log('Fund me at ' + this._wallet.addressString)
-  debug('Pub key:', this._wallet.pub.toHex())
-  // test mode
-  this.balance(function (err, balance) {
-    if (err) return self.emit('error', err)
-
-    console.log('Balance: ' + balance)
-  })
+  this._wallet = options.wallet
 }
 
 /**
@@ -65,7 +46,7 @@ BitJoe.prototype.share = function () {
 }
 
 BitJoe.prototype.requestConfig = function () {
-  var conf = common.pick(this._config, 'prefix', 'minConf', 'networkName')
+  var conf = common.pick(this._options, 'prefix', 'minConf', 'networkName')
   conf.addressBook = this._addressBook
   conf.keeper = this._keeper
   conf.wallet = this._wallet
@@ -76,12 +57,14 @@ BitJoe.prototype.wallet = function () {
   return this._wallet
 }
 
-BitJoe.prototype.config = function (configOption) {
-  return typeof configOption === 'undefined' ? this._config : this._config[configOption]
+// backwards compatible
+BitJoe.prototype.config =
+BitJoe.prototype.option = function (option) {
+  return typeof option === 'undefined' ? this._options : this._options[option]
 }
 
 BitJoe.prototype.isTestnet = function () {
-  return this.config('networkName') === 'testnet'
+  return this.option('networkName') === 'testnet'
 }
 
 BitJoe.prototype.keeper = function () {
@@ -122,5 +105,5 @@ BitJoe.prototype.isTestnet = function () {
 BitJoe.prototype.destroy = function () {}
 
 BitJoe.prototype.networkName = function () {
-  return this.config('networkName')
+  return this.option('networkName')
 }
