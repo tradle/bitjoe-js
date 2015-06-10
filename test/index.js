@@ -162,7 +162,7 @@ test('share an existing file with someone new', function (t) {
     })
     .then(function (resp) {
       var p = resp.permission
-      t.equal(p.key().toString('hex'), '3012abba72f239a70ad207c78e4afdb68adfcad3')
+      t.equal(p.key().toString('hex'), 'c0ade471366346a70ec93999d2c7857af80b877b')
       t.equal(p.fileKeyString(), 'fe1a956ab380fac75413fb73c0c5b30f11518124')
       return checkShared(t, txs, chainloader)
     })
@@ -186,12 +186,11 @@ function checkShared (t, txs, chainloader) {
         t.equal(l.type, 'sharedfile')
         t.equal(l.from.key.priv().toWIF(testnet), joeWif)
         t.equal(l.to.key.priv().toWIF(testnet), friends[i])
-        t.equal(l.from.identity, chainloader.identity)
-        t.equal(l.tx.body, txs[i])
+        t.equal(l.tx.body.toHex(), txs[i].toHex())
       })
 
-      t.equal(loaded[0].permissionKey, '51dd7c56596ed43a9f6d8eaaaa1ec1a78e81de98')
-      t.equal(loaded[1].permissionKey, '3012abba72f239a70ad207c78e4afdb68adfcad3')
+      t.equal(loaded[0].permissionKey, '21f04a7b5141003bc254af7a56c257af0265bf38')
+      t.equal(loaded[1].permissionKey, 'c0ade471366346a70ec93999d2c7857af80b877b')
     })
 }
 
@@ -200,12 +199,13 @@ function compareResps (t, actual, expected) {
   expected.shares.forEach(function (s, i) {
     for (var p in s) {
       var val = actual.shares[i][p]
-      if (p === 'tx') {
+      if (val.toHex) {
         val = val.toHex()
+      } else if (Buffer.isBuffer(val)) {
+        val = val.toString('hex')
       }
 
       t.equal(s[p], val)
     }
   })
 }
-

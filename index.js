@@ -3,7 +3,6 @@
 var common = require('./lib/common')
 var requests = require('./lib/requests')
 var extend = require('extend')
-var KeeperAPI = require('bitkeeper-client-js')
 var utils = require('tradle-utils')
 var typeforce = require('typeforce')
 var Charger = require('testnet-charger')
@@ -26,13 +25,17 @@ function BitJoe (options) {
     balance: 'Function'
   }, options.wallet)
 
+  typeforce({
+    put: 'Function',
+    getOne: 'Function',
+    getMany: 'Function'
+  }, options.keeper)
+
   utils.bindPrototypeFunctions(this)
 
-  this._plugins = Object.create(null)
   this._options = extend({}, options || {})
-  var keeper = this.option('keeper')
-  this._keeper = keeper.isKeeper ? keeper : new KeeperAPI(keeper)
-
+  this._keeper = this.option('keeper')
+  this._plugins = Object.create(null)
   this._dbs = {}
   this._wallet = options.wallet
 }

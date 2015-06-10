@@ -78,13 +78,22 @@ var common = module.exports = {
       })
     }
 
+    var joeIdent = common.identityFor(joe.wallet().priv, net)
     return new ChainLoader({
       wallet: joe.wallet(),
       keeper: joe.keeper(),
       networkName: net,
       prefix: joe.config('prefix'),
-      identity: common.identityFor(joe.wallet().priv, net),
-      addressBook: addressBook
+      lookup: function (addr, cb) {
+        if (addr === joe.wallet().addressString) {
+          return cb(null, {
+            key: joeIdent.keys({ fingerprint: addr })[0],
+            identity: joeIdent
+          })
+        }
+
+        return cb(null, addressBook.byFingerprint(addr))
+      }
     })
   }
 }

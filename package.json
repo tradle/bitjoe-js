@@ -32,7 +32,6 @@
   "license": "MIT",
   "dependencies": {
     "bitcoinjs-lib": "^1.4.1",
-    "bitkeeper-client-js": "git://github.com/tradle/bitkeeper-client-js.git",
     "buffer-equal": "0.0.1",
     "debug": "^2.1.1",
     "extend": "^2.0.0",
