@@ -44,9 +44,9 @@ function BitJoe (options) {
  *  Proxy function to create a new TransactionRequest
  */
 BitJoe.prototype.create =
-  BitJoe.prototype.transaction = function () {
-    return new requests.TransactionRequest(this.requestConfig())
-  }
+BitJoe.prototype.transaction = function () {
+  return new requests.TransactionRequest(this.requestConfig())
+}
 
 BitJoe.prototype.share = function () {
   return new requests.ShareRequest(this.requestConfig())
