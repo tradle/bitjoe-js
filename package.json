@@ -41,7 +41,7 @@
     "tradle-permission": "git://github.com/mvayngrib/permission.git",
     "tradle-tx-data": "git+https://github.com/mvayngrib/tx-data.git",
     "tradle-utils": "git://github.com/tradle/tradle-utils.git",
-    "typeforce": "^0.1.0",
+    "typeforce": "^1.1.2",
     "uniq": "^1.0.1"
   },
   "devDependencies": {

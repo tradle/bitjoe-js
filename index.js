@@ -40,16 +40,16 @@ function BitJoe (options) {
   this._wallet = options.wallet
 }
 
-/**
- *  Proxy function to create a new TransactionRequest
- */
-BitJoe.prototype.create =
-BitJoe.prototype.transaction = function () {
-  return new requests.TransactionRequest(this.requestConfig())
+BitJoe.prototype.create = function (options) {
+  return new requests.Create(extend({}, this.requestConfig(), options || {}))
 }
 
-BitJoe.prototype.share = function () {
-  return new requests.ShareRequest(this.requestConfig())
+BitJoe.prototype.share = function (options) {
+  return new requests.Share(extend({}, this.requestConfig(), options || {}))
+}
+
+BitJoe.prototype.chain = function (options) {
+  return new requests.Chain(extend({}, this.requestConfig(), options || {}))
 }
 
 BitJoe.prototype.requestConfig = function () {
@@ -58,8 +58,7 @@ BitJoe.prototype.requestConfig = function () {
     'minConf',
     'networkName',
     'keeper',
-    'wallet',
-    'addressBook'
+    'wallet'
   )
 }
 

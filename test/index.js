@@ -9,10 +9,10 @@ var resps = require('./fixtures/resps')
 var bufferEqual = require('buffer-equal')
 var multipart = require('chained-obj')
 var common = require('./common')
-var TxReq = require('../lib/requests/transactionRequest')
+var CreateReq = require('../lib/requests/create')
 var testnet = bitcoin.networks.testnet
 // var mi = require('midentity')
-TxReq.prototype._generateSymmetricKey = function () {
+CreateReq.prototype._generateSymmetricKey = function () {
   return new Buffer('1111111111111111111111111111111111111111111111111111111111111111')
 }
 
@@ -38,6 +38,7 @@ test('create a public file, load it', function (t) {
     .data(file)
     .setPublic(true)
     .execute()
+    .then(chainPublic.bind(null, joe))
 
   Q.all([
       getInfoHash,
@@ -83,9 +84,10 @@ test('create a public file + attachment, load it (multipart)', function (t) {
       var getInfoHash = Q.ninvoke(utils, 'getInfoHash', buf)
       var createPromise = joe.create()
         .data(buf)
-        .shareWith(bitcoin.ECKey.fromWIF(friends[0]).pub)
+        // .shareWith(bitcoin.ECKey.fromWIF(friends[0]).pub)
         .setPublic(true)
         .execute()
+        .then(chainPublic.bind(null, joe))
 
       return Q.all([
         getInfoHash,
@@ -129,6 +131,7 @@ test('create a shared encrypted file, load it', function (t) {
     .data(file)
     .shareWith(friendPubs)
     .execute()
+    .then(chainShared.bind(null, joe))
     .then(function (resp) {
       compareResps(t, resp, resps[2])
       return checkShared(t, txs, chainloader)
@@ -153,6 +156,7 @@ test('share an existing file with someone new', function (t) {
 
   var friendPub = bitcoin.ECKey.fromWIF(friends[1]).pub
   createReq.execute()
+    .then(chainShared.bind(null, joe))
     .then(function (resp) {
       t.equal(resp.key, 'fe1a956ab380fac75413fb73c0c5b30f11518124')
       return joe.share()
@@ -160,6 +164,7 @@ test('share an existing file with someone new', function (t) {
         .shareAccessTo(resp.key, createReq._symmetricKey)
         .execute()
     })
+    .then(chainShared.bind(null, joe))
     .then(function (resp) {
       var p = resp.permission
       t.equal(p.key().toString('hex'), 'c0ade471366346a70ec93999d2c7857af80b877b')
@@ -196,6 +201,8 @@ function checkShared (t, txs, chainloader) {
 
 function compareResps (t, actual, expected) {
   t.deepEqual(actual.key, expected.key)
+  if (!expected.shares) return
+
   expected.shares.forEach(function (s, i) {
     for (var p in s) {
       var val = actual.shares[i][p]
@@ -205,7 +212,42 @@ function compareResps (t, actual, expected) {
         val = val.toString('hex')
       }
 
-      t.equal(s[p], val)
+      t.equal(val, s[p])
     }
+  })
+}
+
+function chainPublic (joe, _resp) {
+  var resp = _resp
+  return joe.chain()
+    .data(resp.key)
+    .publish()
+    .execute()
+    .then(function (tx) {
+      var r = resp.shares[0]
+      r.tx = tx
+      r.txId = tx.getId()
+      return resp
+    })
+}
+
+function chainShared (joe, _resp) {
+  var resp = _resp
+  var shares = resp.shares || [resp]
+  return Q.all(
+    shares.map(function (s) {
+      return joe.chain()
+        .data(s.encryptedKey)
+        .to(s.address.toString())
+        .execute()
+    })
+  )
+  .then(function (txs) {
+    txs.forEach(function (tx, i) {
+      shares[i].tx = tx
+      shares[i].txId = tx.getId()
+    })
+
+    return resp
   })
 }
