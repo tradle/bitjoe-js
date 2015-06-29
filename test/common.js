@@ -9,7 +9,6 @@ var mi = require('midentity')
 var Identity = mi.Identity
 var AddressBook = mi.AddressBook
 var Keys = mi.Keys
-var toKey = mi.toKey
 
 var common = module.exports = {
   nulls: function (size) {
@@ -80,29 +79,30 @@ var common = module.exports = {
       })
     }
 
-    var priv = toKey({
-      type: 'bitcoin',
-      fingerprint: joe.wallet().addressString,
-      priv: joe.wallet().priv,
-      networkName: net,
-      purpose: 'payment'
-    })
-
     var joeIdent = common.identityFor(joe.wallet().priv, net)
+    var pubs = joeIdent.exportKeys()
+    var privs = joeIdent.exportKeys(true)
+
     return new ChainLoader({
       wallet: joe.wallet(),
       keeper: joe.keeper(),
       networkName: net,
       prefix: joe.config('prefix'),
-      lookup: function (addr, retPrivate) {
+      lookup: function (addr, returnPrivate) {
         if (addr === joe.wallet().addressString) {
+          var keys = returnPrivate ? privs : pubs
           return Q.resolve({
-            key: retPrivate ? priv : joeIdent.keys({ fingerprint: addr })[0],
+            key: keys.filter(function (k) {return k.fingerprint === addr})[0],
             identity: joeIdent
           })
         }
 
         return Q.resolve(addressBook.byFingerprint(addr))
+          .then(function (result) {
+            result.identity = result.identity.toJSON()
+            result.key = result.key.toJSON()
+            return result
+          })
       }
     })
   }

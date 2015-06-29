@@ -10,7 +10,6 @@ var bufferEqual = require('buffer-equal')
 var multipart = require('chained-obj')
 var common = require('./common')
 var CreateReq = require('../lib/requests/create')
-var testnet = bitcoin.networks.testnet
 // var mi = require('midentity')
 CreateReq.prototype._generateSymmetricKey = function () {
   return new Buffer('1111111111111111111111111111111111111111111111111111111111111111')
@@ -182,15 +181,14 @@ function checkShared (t, txs, chainloader) {
   t.deepEqual(getTxIds(txs), resps[2].shares.map(function (s) {
     return s.txId
   }))
-
   return chainloader.load(txs)
     .then(function (loaded) {
       loaded.forEach(function (l, i) {
         t.equal(l.key, 'fe1a956ab380fac75413fb73c0c5b30f11518124')
         t.equal(l.permission.fileKeyString(), 'fe1a956ab380fac75413fb73c0c5b30f11518124')
         t.equal(l.type, 'sharedfile')
-        t.equal(l.from.key.priv().toWIF(testnet), joeWif)
-        t.equal(l.to.key.priv().toWIF(testnet), friends[i])
+        t.equal(l.from.key.priv, joeWif)
+        t.equal(l.to.key.value, bitcoin.ECKey.fromWIF(friends[i]).pub.toHex())
         t.equal(l.tx.body.toHex(), txs[i].toHex())
       })
 
@@ -224,9 +222,8 @@ function chainPublic (joe, _resp) {
     .publish()
     .execute()
     .then(function (tx) {
-      var r = resp.shares[0]
-      r.tx = tx
-      r.txId = tx.getId()
+      resp.tx = tx
+      resp.txId = tx.getId()
       return resp
     })
 }
