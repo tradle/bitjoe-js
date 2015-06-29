@@ -53,7 +53,7 @@ test('create a public file, load it', function (t) {
       loaded = loaded[0]
       t.equal(loaded.key, '8e2b8d39cf77de22a028e26769003b29a43348ac')
       t.equal(loaded.type, 'public')
-      t.ok(bufferEqual(loaded.file, fileBuf))
+      t.ok(bufferEqual(loaded.data, fileBuf))
       t.end()
     })
 })
@@ -103,8 +103,8 @@ test('create a public file + attachment, load it (multipart)', function (t) {
       loaded = loaded[0]
       t.equal(loaded.key, '2cedcb947f58610f45f2f31c30aba8907274613a')
       t.equal(loaded.type, 'public')
-      t.ok(bufferEqual(loaded.file, sentBuf))
-      return Q.ninvoke(multipart.Parser, 'parse', loaded.file)
+      t.ok(bufferEqual(loaded.data, sentBuf))
+      return Q.ninvoke(multipart.Parser, 'parse', loaded.data)
     })
     .done(function (parsed) {
       t.deepEqual(parsed.data.value, file)
@@ -239,6 +239,7 @@ function chainShared (joe, _resp) {
       return joe.chain()
         .data(s.encryptedKey)
         .to(s.address.toString())
+        .share()
         .execute()
     })
   )

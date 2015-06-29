@@ -1,3 +1,4 @@
+var Q = require('q')
 var Joe = require('../')
 var bitcoin = require('bitcoinjs-lib')
 var helpers = require('tradle-test-helpers')
@@ -8,6 +9,7 @@ var mi = require('midentity')
 var Identity = mi.Identity
 var AddressBook = mi.AddressBook
 var Keys = mi.Keys
+var toKey = mi.toKey
 
 var common = module.exports = {
   nulls: function (size) {
@@ -78,21 +80,29 @@ var common = module.exports = {
       })
     }
 
+    var priv = toKey({
+      type: 'bitcoin',
+      fingerprint: joe.wallet().addressString,
+      priv: joe.wallet().priv,
+      networkName: net,
+      purpose: 'payment'
+    })
+
     var joeIdent = common.identityFor(joe.wallet().priv, net)
     return new ChainLoader({
       wallet: joe.wallet(),
       keeper: joe.keeper(),
       networkName: net,
       prefix: joe.config('prefix'),
-      lookup: function (addr, cb) {
+      lookup: function (addr, retPrivate) {
         if (addr === joe.wallet().addressString) {
-          return cb(null, {
-            key: joeIdent.keys({ fingerprint: addr })[0],
+          return Q.resolve({
+            key: retPrivate ? priv : joeIdent.keys({ fingerprint: addr })[0],
             identity: joeIdent
           })
         }
 
-        return cb(null, addressBook.byFingerprint(addr))
+        return Q.resolve(addressBook.byFingerprint(addr))
       }
     })
   }
