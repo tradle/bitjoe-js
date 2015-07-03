@@ -6,7 +6,6 @@ var Q = require('q')
 var bitcoin = require('bitcoinjs-lib')
 var app = require('./fixtures/app')
 var resps = require('./fixtures/resps')
-var bufferEqual = require('buffer-equal')
 var multipart = require('chained-obj')
 var common = require('./common')
 var CreateReq = require('../lib/requests/create')
@@ -52,7 +51,7 @@ test('create a public file, load it', function (t) {
       loaded = loaded[0]
       t.equal(loaded.key, '8e2b8d39cf77de22a028e26769003b29a43348ac')
       t.equal(loaded.type, 'public')
-      t.ok(bufferEqual(loaded.data, fileBuf))
+      t.deepEqual(loaded.data, fileBuf)
       t.end()
     })
 })
@@ -78,7 +77,8 @@ test('create a public file + attachment, load it (multipart)', function (t) {
     })
 
   Q.ninvoke(mb, 'build')
-    .then(function (buf) {
+    .then(function (build) {
+      var buf = build.form
       sentBuf = buf
       var getInfoHash = Q.ninvoke(utils, 'getInfoHash', buf)
       var createPromise = joe.create()
@@ -102,7 +102,7 @@ test('create a public file + attachment, load it (multipart)', function (t) {
       loaded = loaded[0]
       t.equal(loaded.key, '2cedcb947f58610f45f2f31c30aba8907274613a')
       t.equal(loaded.type, 'public')
-      t.ok(bufferEqual(loaded.data, sentBuf))
+      t.deepEqual(loaded.data, sentBuf)
       return Q.ninvoke(multipart.Parser, 'parse', loaded.data)
     })
     .done(function (parsed) {
