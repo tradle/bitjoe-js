@@ -43,7 +43,6 @@ test('create a public file, load it', function (t) {
       createPromise
     ])
     .spread(function (infoHash, resp) {
-      t.equal(infoHash, resp.key)
       compareResps(t, resp, resps[0])
       return chainloader.load(txs)
     })
@@ -94,19 +93,18 @@ test('create a public file + attachment, load it (multipart)', function (t) {
       ])
     })
     .spread(function (infoHash, resp) {
-      t.equal(infoHash, resp.key)
       compareResps(t, resp, resps[1])
       return chainloader.load(txs)
     })
     .then(function (loaded) {
       loaded = loaded[0]
-      t.equal(loaded.key, '2cedcb947f58610f45f2f31c30aba8907274613a')
+      t.equal(loaded.key, 'c3124d6980ecb72ee344af8c64d053cf1249c235')
       t.equal(loaded.type, 'public')
       t.deepEqual(loaded.data, sentBuf)
       return Q.ninvoke(multipart.Parser, 'parse', loaded.data)
     })
     .done(function (parsed) {
-      t.deepEqual(parsed.data.value, file)
+      t.deepEqual(parsed.data, file)
       t.equal(parsed.attachments.length, 1)
       t.end()
     })
