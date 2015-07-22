@@ -49,7 +49,7 @@ test('create a public file, load it', function (t) {
     .done(function (loaded) {
       loaded = loaded[0]
       t.equal(loaded.key, '8e2b8d39cf77de22a028e26769003b29a43348ac')
-      t.equal(loaded.type, 'public')
+      t.equal(loaded.txType, 'public')
       t.deepEqual(loaded.data, fileBuf)
       t.end()
     })
@@ -99,7 +99,7 @@ test('create a public file + attachment, load it (multipart)', function (t) {
     .then(function (loaded) {
       loaded = loaded[0]
       t.equal(loaded.key, 'c3124d6980ecb72ee344af8c64d053cf1249c235')
-      t.equal(loaded.type, 'public')
+      t.equal(loaded.txType, 'public')
       t.deepEqual(loaded.data, sentBuf)
       return Q.ninvoke(multipart.Parser, 'parse', loaded.data)
     })
@@ -179,15 +179,16 @@ function checkShared (t, txs, chainloader) {
   t.deepEqual(getTxIds(txs), resps[2].shares.map(function (s) {
     return s.txId
   }))
+
   return chainloader.load(txs)
     .then(function (loaded) {
       loaded.forEach(function (l, i) {
         t.equal(l.key, 'fe1a956ab380fac75413fb73c0c5b30f11518124')
         t.equal(l.permission.fileKeyString(), 'fe1a956ab380fac75413fb73c0c5b30f11518124')
-        t.equal(l.type, 'sharedfile')
+        t.equal(l.txType, 'permission')
         t.equal(l.from.key.priv, joeWif)
         t.equal(l.to.key.value, bitcoin.ECKey.fromWIF(friends[i]).pub.toHex())
-        t.equal(l.tx.body.toHex(), txs[i].toHex())
+        t.equal(l.tx.toHex(), txs[i].toHex())
       })
 
       t.equal(loaded[0].permissionKey, '21f04a7b5141003bc254af7a56c257af0265bf38')
