@@ -1,5 +1,5 @@
 var test = require('tape')
-var FakeKeeper = require('tradle-test-helpers').FakeKeeper
+var fakeKeeper = require('tradle-test-helpers').fakeKeeper
 var identity = require('./fixtures/identity')
 var Bitjoe = require('../')
 var extend = require('extend')
@@ -8,7 +8,7 @@ var baseConfig = {
   wallet: {
     autosave: false
   },
-  keeper: FakeKeeper.empty(),
+  keeper: fakeKeeper.empty(),
   prefix: 'test',
   networkName: 'testnet',
   syncInterval: 10000,

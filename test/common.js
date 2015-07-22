@@ -2,7 +2,7 @@ var Q = require('q')
 var Joe = require('../')
 var bitcoin = require('bitcoinjs-lib')
 var helpers = require('tradle-test-helpers')
-var FakeKeeper = helpers.FakeKeeper
+var fakeKeeper = helpers.fakeKeeper
 var fakeWallet = helpers.fakeWallet
 var ChainLoader = require('chainloader')
 var mi = require('midentity')
@@ -46,7 +46,7 @@ var common = module.exports = {
 
     return new Joe({
       wallet: wallet,
-      keeper: FakeKeeper.empty(),
+      keeper: fakeKeeper.empty(),
       prefix: 'test',
       networkName: 'testnet',
       minConf: 0
