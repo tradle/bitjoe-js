@@ -48,7 +48,7 @@ test('create a public file, load it', function (t) {
       return chainloader.load(txs)
     })
     .done(function (loaded) {
-      loaded = loaded[0]
+      loaded = loaded[0].value
       t.equal(loaded.key, '8e2b8d39cf77de22a028e26769003b29a43348ac')
       t.equal(loaded.txType, TxData.types.public)
       t.deepEqual(loaded.data, fileBuf)
@@ -98,7 +98,7 @@ test('create a public file + attachment, load it (multipart)', function (t) {
       return chainloader.load(txs)
     })
     .then(function (loaded) {
-      loaded = loaded[0]
+      loaded = loaded[0].value
       t.equal(loaded.key, 'c3124d6980ecb72ee344af8c64d053cf1249c235')
       t.equal(loaded.txType, TxData.types.public)
       t.deepEqual(loaded.data, sentBuf)
@@ -183,6 +183,7 @@ function checkShared (t, txs, chainloader) {
 
   return chainloader.load(txs)
     .then(function (loaded) {
+      loaded = loaded.map(function (l) { return l.value })
       loaded.forEach(function (l, i) {
         t.equal(l.key, 'fe1a956ab380fac75413fb73c0c5b30f11518124')
         t.equal(l.permission.fileKeyString(), 'fe1a956ab380fac75413fb73c0c5b30f11518124')
