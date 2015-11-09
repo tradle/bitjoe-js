@@ -39,7 +39,7 @@
     "testnet-charger": "^0.1.0",
     "tradle-permission": "git://github.com/tradle/permission.git",
     "tradle-tx-data": "git+https://github.com/tradle/tx-data.git",
-    "tradle-utils": "^0.2.1",
+    "tradle-utils": "^0.2.2",
     "typeforce": "^1.1.2",
     "uniq": "^1.0.1"
   },
