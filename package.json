@@ -1,6 +1,6 @@
 {
   "name": "bitjoe-js",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Tradle bitjoe component in JS",
   "main": "index.js",
   "scripts": {
