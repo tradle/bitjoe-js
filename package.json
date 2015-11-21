@@ -8,7 +8,6 @@
     "style": "standard"
   },
   "pre-commit": [
-    "style",
     "test"
   ],
   "repository": {
@@ -31,6 +30,7 @@
   ],
   "license": "MIT",
   "dependencies": {
+    "@tradle/bitcoinjs-lib": "^1.5.7",
     "bitcoinjs-lib": "mvayngrib/bitcoinjs-lib#lazy1.5.7",
     "debug": "^2.1.1",
     "extend": "^2.0.0",
