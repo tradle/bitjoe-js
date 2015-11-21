@@ -1,13 +1,13 @@
 'use strict'
 
 var test = require('tape')
-var utils = require('tradle-utils')
+var utils = require('@tradle/utils')
 var Q = require('q')
-var bitcoin = require('bitcoinjs-lib')
+var bitcoin = require('@tradle/bitcoinjs-lib')
 var app = require('./fixtures/app')
 var resps = require('./fixtures/resps')
-var multipart = require('chained-obj')
-var TxData = require('tradle-tx-data').TxData
+var multipart = require('@tradle/chained-obj')
+var TxData = require('@tradle/tx-data').TxData
 var common = require('./common')
 var CreateReq = require('../lib/requests/create')
 // var mi = require('midentity')

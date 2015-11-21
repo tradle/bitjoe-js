@@ -1,10 +1,10 @@
 var Q = require('q')
 var Joe = require('../')
-var bitcoin = require('bitcoinjs-lib')
-var helpers = require('tradle-test-helpers')
+var bitcoin = require('@tradle/bitcoinjs-lib')
+var helpers = require('@tradle/test-helpers')
 var fakeKeeper = helpers.fakeKeeper
 var fakeWallet = helpers.fakeWallet
-var ChainLoader = require('chainloader')
+var ChainLoader = require('@tradle/chainloader')
 // var mi = require('midentity')
 // var Identity = mi.Identity
 // var AddressBook = mi.AddressBook

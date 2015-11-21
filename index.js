@@ -3,7 +3,7 @@
 var common = require('./lib/common')
 var requests = require('./lib/requests')
 var extend = require('extend')
-var utils = require('tradle-utils')
+var utils = require('@tradle/utils')
 var typeforce = require('typeforce')
 // var Charger = require('testnet-charger')
 
