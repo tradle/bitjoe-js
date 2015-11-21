@@ -5,7 +5,7 @@ var requests = require('./lib/requests')
 var extend = require('extend')
 var utils = require('tradle-utils')
 var typeforce = require('typeforce')
-var Charger = require('testnet-charger')
+// var Charger = require('testnet-charger')
 
 module.exports = BitJoe
 
@@ -80,28 +80,28 @@ BitJoe.prototype.keeper = function () {
   return this._keeper
 }
 
-BitJoe.prototype.withdrawFromFaucet = function (amount) {
-  return this.charge(1, amount)
-}
+// BitJoe.prototype.withdrawFromFaucet = function (amount) {
+//   return this.charge(1, amount)
+// }
 
 /**
  * @param n - number of addresses to charge
  * @param perAddr - amount to charge each address
  */
-BitJoe.prototype.charge = function (n, perAddr, cb) {
-  if (!this.isTestnet()) return cb(new Error('can only withdraw from faucet on testnet'))
+// BitJoe.prototype.charge = function (n, perAddr, cb) {
+//   if (!this.isTestnet()) return cb(new Error('can only withdraw from faucet on testnet'))
 
-  var wallet = this._wallet
-  var c = new Charger(wallet)
+//   var wallet = this._wallet
+//   var c = new Charger(wallet)
 
-  for (var i = 0; i < n; i++) {
-    // yes, same address multiple times
-    // we only have one in this wallet!
-    c.charge(wallet.addressString, perAddr)
-  }
+//   for (var i = 0; i < n; i++) {
+//     // yes, same address multiple times
+//     // we only have one in this wallet!
+//     c.charge(wallet.addressString, perAddr)
+//   }
 
-  c.execute(cb)
-}
+//   c.execute(cb)
+// }
 
 BitJoe.prototype.balance = function (cb) {
   return this._wallet.balance(cb)

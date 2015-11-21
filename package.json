@@ -36,7 +36,6 @@
     "extend": "^2.0.0",
     "once": "^1.3.1",
     "q": "^1.1.2",
-    "testnet-charger": "^0.1.0",
     "tradle-permission": "git://github.com/tradle/permission.git",
     "tradle-tx-data": "git+https://github.com/tradle/tx-data.git",
     "tradle-utils": "^0.2.2",
