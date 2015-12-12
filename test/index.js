@@ -6,7 +6,6 @@ var Q = require('q')
 var bitcoin = require('@tradle/bitcoinjs-lib')
 var app = require('./fixtures/app')
 var resps = require('./fixtures/resps')
-var multipart = require('@tradle/chained-obj')
 var TxData = require('@tradle/tx-data').TxData
 var common = require('./common')
 var CreateReq = require('../lib/requests/create')
@@ -56,60 +55,60 @@ test('create a public file, load it', function (t) {
     })
 })
 
-test('create a public file + attachment, load it (multipart)', function (t) {
-  t.timeoutAfter(2000)
+// test('create a public file + attachment, load it (multipart)', function (t) {
+//   t.timeoutAfter(2000)
 
-  var file = app.models[0]
-  var txs = []
-  var joe = common.mkJoe(joeWif, function send (tx) {
-    txs.push(tx)
-  })
+//   var file = app.models[0]
+//   var txs = []
+//   var joe = common.mkJoe(joeWif, function send (tx) {
+//     txs.push(tx)
+//   })
 
-  var chainloader = common.chainloaderFor(joe, friends)
-  var attachment = './test/fixtures/logo.png'
+//   var chainloader = common.chainloaderFor(joe, friends)
+//   var attachment = './test/fixtures/logo.png'
 
-  var sentBuf
-  var mb = multipart.Builder()
-    .data(file)
-    .attach({
-      name: 'logo',
-      path: attachment
-    })
+//   var sentBuf
+//   var mb = multipart.Builder()
+//     .data(file)
+//     .attach({
+//       name: 'logo',
+//       path: attachment
+//     })
 
-  Q.ninvoke(mb, 'build')
-    .then(function (build) {
-      var buf = build.form
-      sentBuf = buf
-      var getInfoHash = Q.ninvoke(utils, 'getInfoHash', buf)
-      var createPromise = joe.create()
-        .data(buf)
-        // .shareWith(bitcoin.ECKey.fromWIF(friends[0]).pub)
-        .setPublic(true)
-        .execute()
-        .then(chainPublic.bind(null, joe))
+//   Q.ninvoke(mb, 'build')
+//     .then(function (build) {
+//       var buf = build.form
+//       sentBuf = buf
+//       var getInfoHash = Q.ninvoke(utils, 'getInfoHash', buf)
+//       var createPromise = joe.create()
+//         .data(buf)
+//         // .shareWith(bitcoin.ECKey.fromWIF(friends[0]).pub)
+//         .setPublic(true)
+//         .execute()
+//         .then(chainPublic.bind(null, joe))
 
-      return Q.all([
-        getInfoHash,
-        createPromise
-      ])
-    })
-    .spread(function (infoHash, resp) {
-      compareResps(t, resp, resps[1])
-      return chainloader.load(txs)
-    })
-    .then(function (loaded) {
-      loaded = loaded[0].value
-      t.equal(loaded.key, 'c3124d6980ecb72ee344af8c64d053cf1249c235')
-      t.equal(loaded.txType, TxData.types.public)
-      t.deepEqual(loaded.data, sentBuf)
-      return Q.ninvoke(multipart.Parser, 'parse', loaded.data)
-    })
-    .done(function (parsed) {
-      t.deepEqual(parsed.data, file)
-      t.equal(parsed.attachments.length, 1)
-      t.end()
-    })
-})
+//       return Q.all([
+//         getInfoHash,
+//         createPromise
+//       ])
+//     })
+//     .spread(function (infoHash, resp) {
+//       compareResps(t, resp, resps[1])
+//       return chainloader.load(txs)
+//     })
+//     .then(function (loaded) {
+//       loaded = loaded[0].value
+//       t.equal(loaded.key, 'c3124d6980ecb72ee344af8c64d053cf1249c235')
+//       t.equal(loaded.txType, TxData.types.public)
+//       t.deepEqual(loaded.data, sentBuf)
+//       return Q.ninvoke(multipart.Parser, 'parse', loaded.data)
+//     })
+//     .done(function (parsed) {
+//       t.deepEqual(parsed.data, file)
+//       t.equal(parsed.attachments.length, 1)
+//       t.end()
+//     })
+// })
 
 test('create a shared encrypted file, load it', function (t) {
   t.timeoutAfter(2000)
