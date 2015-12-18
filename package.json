@@ -32,7 +32,7 @@
   "dependencies": {
     "@tradle/bitcoinjs-lib": "^1.5.7",
     "@tradle/permission": "^1.0.1",
-    "@tradle/tx-data": "^0.0.1",
+    "@tradle/tx-data": "^1.0.0",
     "@tradle/utils": "^1.0.0",
     "debug": "^2.1.1",
     "extend": "^2.0.0",
