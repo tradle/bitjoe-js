@@ -2,6 +2,13 @@
 
 var test = require('tape')
 var utils = require('@tradle/utils')
+var encryptAsync = utils.encryptAsync
+var TEST_IV = new Buffer('f5bc75d07a12c86b581c5719e05e9af4', 'hex')
+utils.encryptAsync = function (opts, cb) {
+  opts.iv = TEST_IV
+  return encryptAsync.call(utils, opts, cb)
+}
+
 var Q = require('q')
 var bitcoin = require('@tradle/bitcoinjs-lib')
 var app = require('./fixtures/app')
@@ -11,7 +18,7 @@ var common = require('./common')
 var CreateReq = require('../lib/requests/create')
 // var mi = require('midentity')
 CreateReq.prototype._generateSymmetricKey = function () {
-  return new Buffer('1111111111111111111111111111111111111111111111111111111111111111')
+  return Q(new Buffer('1111111111111111111111111111111111111111111111111111111111111111', 'hex'))
 }
 
 var joeWif = 'cNPQ8SgxZLfdMBMhhnQCu4HAg8VV1L5C3AnH3t5s7WMt43t7qPHL'
@@ -155,7 +162,7 @@ test('share an existing file with someone new', function (t) {
   createReq.execute()
     .then(chainShared.bind(null, joe))
     .then(function (resp) {
-      t.equal(resp.key, 'fe1a956ab380fac75413fb73c0c5b30f11518124')
+      t.equal(resp.key, 'acca36d024b769ef7192f9419ab50758a2b4822b')
       return joe.share()
         .shareAccessWith(friendPub)
         .shareAccessTo(resp.key, createReq._symmetricKey)
@@ -164,8 +171,8 @@ test('share an existing file with someone new', function (t) {
     .then(chainShared.bind(null, joe))
     .then(function (resp) {
       var p = resp.permission
-      t.equal(p.key().toString('hex'), 'c0ade471366346a70ec93999d2c7857af80b877b')
-      t.equal(p.fileKeyString(), 'fe1a956ab380fac75413fb73c0c5b30f11518124')
+      t.equal(p.key().toString('hex'), 'e8b0f3fcd91c809e1128c45bf14a4aa9e2a13da8')
+      t.equal(p.fileKeyString(), 'acca36d024b769ef7192f9419ab50758a2b4822b')
       return checkShared(t, txs, chainloader)
     })
     .done(t.end)
@@ -184,16 +191,16 @@ function checkShared (t, txs, chainloader) {
     .then(function (loaded) {
       loaded = loaded.map(function (l) { return l.value })
       loaded.forEach(function (l, i) {
-        t.equal(l.key, 'fe1a956ab380fac75413fb73c0c5b30f11518124')
-        t.equal(l.permission.fileKeyString(), 'fe1a956ab380fac75413fb73c0c5b30f11518124')
+        t.equal(l.key, 'acca36d024b769ef7192f9419ab50758a2b4822b')
+        t.equal(l.permission.fileKeyString(), 'acca36d024b769ef7192f9419ab50758a2b4822b')
         t.equal(l.txType, TxData.types.permission)
         t.equal(l.from.key.priv, joeWif)
         t.equal(l.to.key.value, bitcoin.ECKey.fromWIF(friends[i]).pub.toHex())
         t.equal(l.tx.toHex(), txs[i].toHex())
       })
 
-      t.equal(loaded[0].permissionKey, '21f04a7b5141003bc254af7a56c257af0265bf38')
-      t.equal(loaded[1].permissionKey, 'c0ade471366346a70ec93999d2c7857af80b877b')
+      t.equal(loaded[0].permissionKey, '7a0e85e0ac1a444d1656818ec84c2738ba51b55b')
+      t.equal(loaded[1].permissionKey, 'e8b0f3fcd91c809e1128c45bf14a4aa9e2a13da8')
     })
 }
 
